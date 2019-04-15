@@ -1,0 +1,14 @@
+SN Name			B_13 at 1 ms	M_ej at 1 ms	P_max	B_13 at P_max	M_ej at P_max	z	tshift
+			
+SN2010kd		4.7		25		2.4	2.0		4.0		0.1	6
+SN2007bi		4.0		25		2.2	2.0		5.5		0.1279	0
+SN2005ap		3.0		7		1.4	2.0		2.0		0.2832	0
+PTF09cnd 		2.0		14		1.0	2.0		14		0.258 	0
+SN2006oz 		5.0		12.5		2.0	2.0		2.5		0.396   -3
+SN2010gx		4.5		10.0		1.6	3.5		3.5		0.2297
+SN2011ke		7.5		9.5		2.4	2.9		1.3		0.1428
+PTF10hgi		14		15		4.2	4.0		2.0		0.0987	0
+
+SCP-06F6  		can not generate enough luminosity to reproduce data			
+PTF09atu		not enough data after peak
+PTF09cwl		data too sparse
