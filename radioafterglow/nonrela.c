@@ -1,13 +1,11 @@
-/* Updates from ver.1 */
-/* The thermal Lorentz factor of the injection electron spectrum is now parameterized by fac_T. */
-/* The effect of inverse Compton emission is included. */
+/* Non-relativistic radio afterglow calculation (kashiyama et al. 18) */
 
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include "dcbh.h"
+#include "nonrela.h"
 
 /* input parameters */
 
@@ -58,6 +56,8 @@ const double NU_3 = 1.0e10; /* plot frequency 3 */
 const double NU_4 = 1.0e11; /* plot frequency 4 */
 const double NU_5 = 1.5e18; /* plot frequency 5 */
 
+
+/* subroutines */
 void shock_dynamics(double r, double *dt, double *dr, double *dr_sh, double *v, double *rho, double *rho_sh, double *Vol_sh);
 void nth_e_and_sh_B( double t, double v, double rho,double *B_sh, double *gamma_e_inj, double *gamma_e_max, double *gamma_e_cool, double *gamma_e_th);
 void elec_injection(double r, double v, double rho_sh, double B_sh, double gamma_e_inj, double gamma_e_th, double gamma_e_max, double gamma_e[], double dne_dt_inj[]);
@@ -70,6 +70,8 @@ void syn_spec(double B_sh, double dr_sh, double Vol_sh, double ne[], double gamm
 	      double P_nu_syn[], double alpha_nu_syn[], double tau_sa[], double P_nu_syn_esc[]);
 void ic_spec(double Vol_sh, double dr_sh, double P_nu_syn_esc[], double ne[], double gamma_e[], double del_ln_gamma_e, double gamma_ph[], double del_ln_gamma_ph, double P_nu_ic[]);
 void set_var(double mu[], double *del_mu, double gamma_e[], double dene_e[], double *del_ln_gamma_e, double gamma_ph[], double dene_ph[], double *del_ln_gamma_ph);
+
+
 
 int main()
 {
