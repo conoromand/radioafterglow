@@ -1,2 +1,1 @@
-Radio afterglow calculator 
-both from relatisitic and non-relativisitc outflow
+A calculator of radio afterglow emission both from relatisitic and non-relativisitc outflow
