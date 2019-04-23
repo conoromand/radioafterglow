@@ -49,82 +49,82 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 int main()
 {
-  /* Ambient density profile */
-  double v_w_str=2.0e8;
-  double Mdot_str=1.0e-4*M_SUN/YR;
-  double k=2.0;
-  double A=Mdot_str/4.0/M_PI/v_w_str;
-  //double k=0.0;
-  //double A=0.1*M_PRO;
-
-  /* Granot & Piran 2011 */
-  double a=1.0; 
-  double b=0.45; 
-
-  /* redshift and distance */
-  double z = 20.0;
-  double d_h=0.0,d_c=0.0,d_a=0.0,d_l=0.0;
-  distances(z,&d_h,&d_c,&d_a,&d_l);
-
-  /* jet parameters  */
-  double theta_j_0=2.0*M_PI*5.0/360.0;
-  double gam_j_0=200.0;
-  double E_j_0=1.0e55*(1.0-cos(theta_j_0));
-
-  /* shock parameters */
-  double eps_B = 0.001;
-  double eps_e = 0.01;
-  double p = 2.2;
-
-  conical_model(k,A,a,b,z,theta_j_0,gam_j_0);
-  shocked_jet_conical(k,A,z,theta_j_0,E_j_0,eps_B);
+    /* Ambient density profile */
+    double v_w_str=2.0e8;
+    double Mdot_str=1.0e-4*M_SUN/YR;
+    double k=2.0;
+    double A=Mdot_str/4.0/M_PI/v_w_str;
+    //double k=0.0;
+    //double A=0.1*M_PRO;
+    
+    /* Granot & Piran 2011 */
+    double a=1.0;
+    double b=0.45;
+    
+    /* redshift and distance */
+    double z = 20.0;
+    double d_h=0.0,d_c=0.0,d_a=0.0,d_l=0.0;
+    distances(z,&d_h,&d_c,&d_a,&d_l);
+    
+    /* jet parameters  */
+    double theta_j_0=2.0*M_PI*5.0/360.0;
+    double gam_j_0=200.0;
+    double E_j_0=1.0e55*(1.0-cos(theta_j_0));
+    
+    /* shock parameters */
+    double eps_B = 0.001;
+    double eps_e = 0.01;
+    double p = 2.2;
+    
+    conical_model(k,A,a,b,z,theta_j_0,gam_j_0);
+    shocked_jet_conical(k,A,z,theta_j_0,E_j_0,eps_B);
     printf("test\n");
-
-  return 0;
+    
+    return 0;
 }
 
 double theta_ana(double r, double a, double b, double k)
 {
-  /* Eq.(25) of Granot & Piran 2011 */
-  return b*pow(r,-(3.0-k)*(1.0+a)/(3.0+a)/(3.0+a))*exp((3.0+a)/(3.0-k)/(1.0+a)*pow(r,(3.0-k)*(1.0+a)/(3.0+a)));
+    /* Eq.(25) of Granot & Piran 2011 */
+    return b*pow(r,-(3.0-k)*(1.0+a)/(3.0+a)/(3.0+a))*exp((3.0+a)/(3.0-k)/(1.0+a)*pow(r,(3.0-k)*(1.0+a)/(3.0+a)));
 }
 
 double gam_ana(double r, double a, double b, double k)
 {
-  /* Eq.(26) of Granot & Piran 2011 */
-  return 1.0/b*pow(r,-2.0*(3.0-k)/(3.0+a)/(3.0+a))*exp(-(3.0+a)/(3.0-k)/(1.0+a)*pow(r,(3.0-k)*(1.0+a)/(3.0+a)));
+    /* Eq.(26) of Granot & Piran 2011 */
+    return 1.0/b*pow(r,-2.0*(3.0-k)/(3.0+a)/(3.0+a))*exp(-(3.0+a)/(3.0-k)/(1.0+a)*pow(r,(3.0-k)*(1.0+a)/(3.0+a)));
 }
 
 
 void conical_model(double k, double A, double a, double b, double z, double theta_j_0, double gam_j_0)
 {
-  FILE *op;
-  char head[256]="conical_model",dat[256]=".dat",output_file_name[256]={"\0"};
-  sprintf(output_file_name,"%s%s",head,dat);
-
-  int i;
-  double r_s_min=pow((1.0-cos(theta_j_0))*(gam_j_0*gam_j_0-1.0),-1.0/(3.0-k)),r_s_max=1.0e1,del_ln_r_s=(log(r_s_max)-log(r_s_min))/(double)(n_rbin-1),r_s=r_s_min,dr_s=0.0;
-  double theta_j_tmp=theta_j_0,u_tmp=sqrt(gam_j_0*gam_j_0-1.0);
-  double t=r_s_min,dt=0.0,t_obs=(1.0+z)*(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*t;
-
-  op = fopen(output_file_name,"w+");
-  fprintf(op,"#k=%le A=%le a=%le b=%le\n",k,A,a,b);
-  for (i=0;i<n_rbin;i++){
-    r_s = r_s_min*exp(del_ln_r_s*(double)i);
-    dr_s = r_s*(exp(del_ln_r_s)-1.0);
-    dt = dr_s/sqrt(1.0-1.0/(u_tmp*u_tmp+1.0));
-    t += dt;
-    t_obs += (1.0+z)*(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*dt;
-
-    theta_j_tmp += 1.0/r_s/pow(1.0+pow(r_s,k-3.0)/(1.0-cos(theta_j_tmp)),(1.0+a)/2.0)/pow(theta_j_tmp,a)*dr_s;
-    if (theta_j_tmp>M_PI/2.0)
-      theta_j_tmp = M_PI/2.0;
-    u_tmp = pow(r_s,-(3.0-k)/2.0)/sqrt(1.0-cos(theta_j_tmp));
-
-    fprintf(op,"%le %le %le %le %le %le \n",
-	    r_s*pow(4.0/(3.0-k),-1.0/(3.0-k)),t*pow(4.0/(3.0-k),-1.0/(3.0-k)),t_obs*pow(4.0/(3.0-k),-1.0/(3.0-k)),theta_j_tmp,u_tmp,sqrt(u_tmp*u_tmp+1.0));
-  }
-  fclose(op);
+    FILE *op;
+    char head[256]="conical_model",dat[256]=".dat",output_file_name[256]={"\0"};
+    sprintf(output_file_name,"%s%s",head,dat);
+    
+    int i;
+    double r_s_min=pow((1.0-cos(theta_j_0))*(gam_j_0*gam_j_0-1.0),-1.0/(3.0-k)),r_s_max=1.0e1,del_ln_r_s=(log(r_s_max)-log(r_s_min))/(double)(n_rbin-1),r_s=r_s_min,dr_s=0.0;
+    double theta_j_tmp=theta_j_0,u_tmp=sqrt(gam_j_0*gam_j_0-1.0);
+    double t=r_s_min,dt=0.0,t_obs=(1.0+z)*(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*t;
+    
+    op = fopen(output_file_name,"w+");
+    fprintf(op,"#k=%le A=%le a=%le b=%le\n",k,A,a,b);
+    for (i=0;i<n_rbin;i++){
+        r_s = r_s_min*exp(del_ln_r_s*(double)i);
+        dr_s = r_s*(exp(del_ln_r_s)-1.0);
+        dt = dr_s/sqrt(1.0-1.0/(u_tmp*u_tmp+1.0));
+        t += dt;
+        t_obs += (1.0+z)*(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*dt;
+        
+        theta_j_tmp += 1.0/r_s/pow(1.0+pow(r_s,k-3.0)/(1.0-cos(theta_j_tmp)),(1.0+a)/2.0)/pow(theta_j_tmp,a)*dr_s;
+        if (theta_j_tmp>M_PI/2.0)
+            theta_j_tmp = M_PI/2.0;
+        u_tmp = pow(r_s,-(3.0-k)/2.0)/sqrt(1.0-cos(theta_j_tmp));
+        
+        fprintf(op,"%le %le %le %le %le %le \n",
+                r_s*pow(4.0/(3.0-k),-1.0/(3.0-k)),t*pow(4.0/(3.0-k),-1.0/(3.0-k)),t_obs*pow(4.0/(3.0-k),-1.0/(3.0-k)),theta_j_tmp,u_tmp,sqrt(u_tmp*u_tmp+1.0));
+    }
+    fclose(op);
 }
 
 
@@ -178,13 +178,80 @@ void shocked_jet_conical(double k, double A, double z, double theta_j_0, double 
     
 }
 
-/* energy distribution of electrons in the shocked jet rest frame */
-void elec_spec(double n_sh){
-    
-}
 
 /* integration of Eqs. (2) and (4) of Granot, Piran, and Sari 99 */
 /* 先ずは愚直に1000time step分のP_nuとalpha_nuを吐いてみよう。*/
+void elec_injection(double tprime, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[])
+{
+    double integ_th=0.0,integ_nth=0.0,gam_e_th_tmp=1.0;
+    double del_ln_gam_th = log(gam_e_max)/(double)(N_ne-1);
+    int i;
+    
+    for (i=1;i<N_ne-1;i++)
+    {
+        gam_e_th_tmp = exp(del_ln_gam_th*(double)i);
+        integ_th += (gam_e_th_tmp*sqrt(gam_e_th_tmp*gam_e_th_tmp-1.0)*exp(-gam_e_th_tmp/gam_e_th)*gam_e_th_tmp)*del_ln_gam_th;
+    }
+    integ_th += 0.5*(gam_e_max*sqrt(gam_e_max*gam_e_max-1.0)*exp(-gam_e_max/gam_e_th)*gam_e_max)*del_ln_gam_th;
+    
+    if (POW_ELE != 1.0){
+        integ_nth = (pow(gam_e_inj,1.0-POW_ELE)-pow(gam_e_max,1.0-POW_ELE))/(POW_ELE-1.0);
+    } else {
+        integ_nth = log(gam_e_max/gam_e_inj);
+    }
+    
+    double dne_tot = n_sh/tprime;
+    double norm_th = (1.0-FRAC_E)*dne_tot/integ_th;
+    double norm_nth = FRAC_E*dne_tot/integ_nth;
+    
+    for (i=0;i<N_ne;i++){
+        if (gam_e[i] > gam_e_inj && gam_e[i] < gam_e_max)
+            dne_dt_inj[i] = norm_th*gam_e[i]*sqrt(gam_e[i]*gam_e[i]-1.0)*exp(-gam_e[i]/gam_e_th)+norm_nth*pow(gam_e[i],-POW_ELE);
+        else
+            dne_dt_inj[i] = norm_th*gam_e[i]*sqrt(gam_e[i]*gam_e[i]-1.0)*exp(-gam_e[i]/gam_e_th);
+    }
+}
+
+
+double power_ad(double gam_e, double t)
+{
+    return gam_e*MeC2/t;
+}
+
+double power_syn(double gam_e, double B_sh)
+{
+    // electron synchrotron energy loss rate (see e.g., Eq. 7.13 of Dermer & Menon)
+    // double sin2phi = 2.0/3.0; /* averaging pitch angle */
+    // double beta_par = 1.0; /* assuming that particles are relativistic */
+    
+    return 4.0/3.0*C*SIGMA_T*(B_sh*B_sh/8.0/M_PI)*gam_e*gam_e;
+}
+
+
+void elec_cooling(double t, double B_sh,double t_ad[], double t_syn[], double P_ad[], double P_syn[], double P_cool[], double gam_e[])
+{
+    int i;
+    for (i=0;i<N_ne;i++) {
+        P_ad[i] = power_ad(gam_e[i],t);
+        P_syn[i] = power_syn(gam_e[i],B_sh);
+        P_cool[i] = P_ad[i]+P_syn[i];
+        t_ad[i] = gam_e[i]*MeC2/P_ad[i];
+        t_syn[i] = gam_e[i]*MeC2/P_syn[i];
+    }
+}
+
+void elec_time_evolution(double dt, double gam_e[], double dene_e[], double ne_old[], double ne_new[], double dne_dt_inj[], double P_cool[])
+{
+    int i;
+    
+    ne_new[N_ne-1] = (ne_old[N_ne-1]+dne_dt_inj[N_ne-1]*dt)/(1.0+dt/dene_e[N_ne-1]*P_cool[N_ne-1]);
+    for(i=N_ne-2;i>0;i--){
+        ne_new[i] = (ne_old[i]+dne_dt_inj[i]*dt+ne_old[i+1]*dt/dene_e[i]*P_cool[i+1])/(1.0+dt/dene_e[i]*P_cool[i]);
+    }
+    ne_new[0] = ne_old[0]+dne_dt_inj[0]+ne_old[1]*dt/dene_e[1]*P_cool[1]/(1.0+dt/dene_e[0]*P_cool[0]);
+    
+}
+
 
 /* Synchrotron emission */
 double syn_func_fit(double x)
