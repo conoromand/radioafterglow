@@ -8,7 +8,6 @@ const double M_c = 22.0*2e33; /* [g] */
 const double R_c = 2.0e13; /* [cm] */
 const double kappa = 0.35; /* [cm^2 g^{-1}] */
 const double T_ion = 6000; /* [K] */
-const double z = 3.0; /* redshift */
 
 const double C = 2.9979e10; /* [cm] */
 const double SIGMA_T = 6.6524e-25; /* [cm^2] */
@@ -33,14 +32,14 @@ const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 const int N_ne = 256;
 const int N_nph = 256; /* need to be the same as N_ne */
 
-const double XI_T = 0.24;
 const double ZETA_E = 0.4;
+const double FRAC_E = 0.1;
+const double XI_T = 0.24;
+const double POW_ELE = 2.0;
 
 
-double theta_ana(double r, double a, double b, double k);
-double gam_ana(double r, double a, double b, double k);
-void conical_model(double k, double A, double a, double b, double z, double theta_j_0, double gam_j_0);
-void shocked_jet_conical(double k, double A, double z, double theta_j_0, double E_j_0, double eps_B);
+void conical_model(double k, double A, double a, double b, double theta_j_0, double gam_j_0);
+void shocked_jet_conical(double k, double A, double theta_j_0, double E_j_0, double eps_B);
 void sync_spec_para_conical(double z, double d_l, double k, double p);
 double sync_spec_conical(double nu, double nu_m, double nu_c, double F_nu_max, double gam_j, double B_f, double R_perp, double p, double z, double d_l);
 double syn_func_fit(double x);
@@ -62,7 +61,7 @@ int main()
     double b=0.45;
     
     /* redshift and distance */
-    double z = 20.0;
+    double z = 0.1;
     double d_h=0.0,d_c=0.0,d_a=0.0,d_l=0.0;
     distances(z,&d_h,&d_c,&d_a,&d_l);
     
@@ -76,27 +75,14 @@ int main()
     double eps_e = 0.01;
     double p = 2.2;
     
-    conical_model(k,A,a,b,z,theta_j_0,gam_j_0);
-    shocked_jet_conical(k,A,z,theta_j_0,E_j_0,eps_B);
-    printf("test\n");
+    conical_model(k,A,a,b,theta_j_0,gam_j_0);
+    shocked_jet_conical(k,A,theta_j_0,E_j_0,eps_B);
     
     return 0;
 }
 
-double theta_ana(double r, double a, double b, double k)
-{
-    /* Eq.(25) of Granot & Piran 2011 */
-    return b*pow(r,-(3.0-k)*(1.0+a)/(3.0+a)/(3.0+a))*exp((3.0+a)/(3.0-k)/(1.0+a)*pow(r,(3.0-k)*(1.0+a)/(3.0+a)));
-}
 
-double gam_ana(double r, double a, double b, double k)
-{
-    /* Eq.(26) of Granot & Piran 2011 */
-    return 1.0/b*pow(r,-2.0*(3.0-k)/(3.0+a)/(3.0+a))*exp(-(3.0+a)/(3.0-k)/(1.0+a)*pow(r,(3.0-k)*(1.0+a)/(3.0+a)));
-}
-
-
-void conical_model(double k, double A, double a, double b, double z, double theta_j_0, double gam_j_0)
+void conical_model(double k, double A, double a, double b, double theta_j_0, double gam_j_0)
 {
     FILE *op;
     char head[256]="conical_model",dat[256]=".dat",output_file_name[256]={"\0"};
@@ -105,7 +91,7 @@ void conical_model(double k, double A, double a, double b, double z, double thet
     int i;
     double r_s_min=pow((1.0-cos(theta_j_0))*(gam_j_0*gam_j_0-1.0),-1.0/(3.0-k)),r_s_max=1.0e1,del_ln_r_s=(log(r_s_max)-log(r_s_min))/(double)(n_rbin-1),r_s=r_s_min,dr_s=0.0;
     double theta_j_tmp=theta_j_0,u_tmp=sqrt(gam_j_0*gam_j_0-1.0);
-    double t=r_s_min,dt=0.0,t_obs=(1.0+z)*(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*t;
+    double t=r_s_min,dt=0.0,t_s=(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*t;
     
     op = fopen(output_file_name,"w+");
     fprintf(op,"#k=%le A=%le a=%le b=%le\n",k,A,a,b);
@@ -114,7 +100,7 @@ void conical_model(double k, double A, double a, double b, double z, double thet
         dr_s = r_s*(exp(del_ln_r_s)-1.0);
         dt = dr_s/sqrt(1.0-1.0/(u_tmp*u_tmp+1.0));
         t += dt;
-        t_obs += (1.0+z)*(1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*dt;
+        t_s += (1.0-sqrt(1.0-1.0/(u_tmp*u_tmp+1.0)))*dt;
         
         theta_j_tmp += 1.0/r_s/pow(1.0+pow(r_s,k-3.0)/(1.0-cos(theta_j_tmp)),(1.0+a)/2.0)/pow(theta_j_tmp,a)*dr_s;
         if (theta_j_tmp>M_PI/2.0)
@@ -122,25 +108,25 @@ void conical_model(double k, double A, double a, double b, double z, double thet
         u_tmp = pow(r_s,-(3.0-k)/2.0)/sqrt(1.0-cos(theta_j_tmp));
         
         fprintf(op,"%le %le %le %le %le %le \n",
-                r_s*pow(4.0/(3.0-k),-1.0/(3.0-k)),t*pow(4.0/(3.0-k),-1.0/(3.0-k)),t_obs*pow(4.0/(3.0-k),-1.0/(3.0-k)),theta_j_tmp,u_tmp,sqrt(u_tmp*u_tmp+1.0));
+                r_s*pow(4.0/(3.0-k),-1.0/(3.0-k)),t*pow(4.0/(3.0-k),-1.0/(3.0-k)),t_s*pow(4.0/(3.0-k),-1.0/(3.0-k)),theta_j_tmp,u_tmp,sqrt(u_tmp*u_tmp+1.0));
     }
     fclose(op);
 }
 
 
-void shocked_jet_conical(double k, double A, double z, double theta_j_0, double E_j_0, double eps_B)
+void shocked_jet_conical(double k, double A, double theta_j_0, double E_j_0, double eps_B)
 {
     int i=0;
     
     /* reading the input file of the jet dynamics */
-    double r[n_rbin],t[n_rbin],t_obs[n_rbin],theta_j[n_rbin],gam_j[n_rbin];
+    double r[n_rbin],t[n_rbin],t_s[n_rbin],t_prime[n_rbin],theta_j[n_rbin],gam_j[n_rbin];
     FILE *ip;
     char head_ip[256]="conical_model",dat[256]=".dat",input_file_name[256]={"\0"};
     sprintf(input_file_name,"%s%s",head_ip,dat);
     
     ip = fopen(input_file_name,"r");
     fscanf(ip,"%*[^\n]");
-    while (fscanf(ip,"%le %le %le %le %*le %le \n",&r[i],&t[i],&t_obs[i],&theta_j[i],&gam_j[i])!=EOF) {
+    while (fscanf(ip,"%le %le %le %le %*le %le \n",&r[i],&t[i],&t_s[i],&theta_j[i],&gam_j[i])!=EOF) {
         i++;
     }
     fclose(ip);
@@ -152,7 +138,8 @@ void shocked_jet_conical(double k, double A, double z, double theta_j_0, double 
     
     for (i=0;i<n_rbin;i++){
         t[i] = R_j*t[i]/C;
-        t_obs[i] = R_j*t_obs[i]/C;
+        t_s[i] = R_j*t_s[i]/C; /* source rest frame */
+        t_prime[i] = t_s[i]/gam_j[i]; /* jet rest frame */
         R_perp[i] = R_j*r[i]*(2.0*theta_j[i]-sin(2.0*theta_j[i]))/2.0/M_PI/(1.0-cos(theta_j[i]));
         R_para[i] = R_j*r[i]*sin(theta_j[i])*sin(theta_j[i])/2.0/(1.0-cos(theta_j[i]));
         theta_ene_ave[i] = (sin(theta_j[i])-theta_j[i]*cos(theta_j[i]))/(1.0-cos(theta_j[i]));
@@ -169,10 +156,10 @@ void shocked_jet_conical(double k, double A, double z, double theta_j_0, double 
     char head_op[256]="shock_acc_conical",output_file_name[256]={"\0"};
     sprintf(output_file_name,"%s%s",head_op,dat);
     op = fopen(output_file_name,"w+");
-    fprintf(op,"# t[s], t_obs[s], gam_j, R_perp[cm], R_para[cm], theta_j, n_f[cm^-3], B_f[G], gam_e_th, gam_e_inj, gam_e_max \n");
+    fprintf(op,"# t_s[s], t_prime[s], gam_j, R_perp[cm], R_para[cm], theta_j, n_f[cm^-3], B_f[G], gam_e_th, gam_e_inj, gam_e_max \n");
     for (i=0;i<n_rbin;i++){
         fprintf(op,"%le %le %le %le %le %le %le %le %le %le %le \n",
-                t[i],t_obs[i],gam_j[i],R_perp[i],R_para[i],theta_ene_ave[i],n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
+                t_s[i],t_prime[i],gam_j[i],R_perp[i],R_para[i],theta_ene_ave[i],n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
     }
     fclose(op);
     
@@ -356,44 +343,6 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l)
 
 
 
-
-void sync_spec_para_conical(double z, double d_l, double k, double p)
-{
-    int i=0;
-    
-    /* reading the input file of the shock accreleation */
-    double t[n_rbin],t_obs[n_rbin],gam_j[n_rbin],R_perp[n_rbin],R_para[n_rbin],theta_ene_ave[n_rbin],n_amb[n_rbin],B_f[n_rbin],gam_e_m[n_rbin],gam_e_c[n_rbin];
-    
-    FILE *ip;
-    char head_ip[256]="shock_acc_conical",dat[256]=".dat",input_file_name[256]={"\0"};
-    sprintf(input_file_name,"%s%s",head_ip,dat);
-    ip = fopen(input_file_name,"r");
-    fscanf(ip,"%*[^\n]");
-    while (fscanf(ip,"%le %le %le %le %le %le %le %le %le %le \n",
-                  &t[i],&t_obs[i],&gam_j[i],&R_perp[i],&R_para[i],&theta_ene_ave[i],&n_amb[i],&B_f[i],&gam_e_m[i],&gam_e_c[i])!=EOF) {
-        i++;
-    }
-    fclose(ip);
-    
-    /* calculating the synchrotron spectrum */
-    double F_nu_max[n_rbin],nu_m[n_rbin],nu_c[n_rbin];
-    for (i=0;i<n_rbin;i++){
-        F_nu_max[i] = SIGMA_T*M_ELE*C*C*pow(R_para[i],3.0)*n_amb[i]*B_f[i]*gam_j[i]*(1.0+z)/3.0/(3.0-k)/ELEC/d_l/d_l;
-        nu_m[i] = gam_j[i]*gam_e_m[i]*gam_e_m[i]*ELEC*B_f[i]/2.0/M_PI/M_ELE/C/(1.0+z);
-        nu_c[i] = gam_j[i]*gam_e_c[i]*gam_e_c[i]*ELEC*B_f[i]/2.0/M_PI/M_ELE/C/(1.0+z);
-    }
-    
-    /* outputting the microphysics parameters at the shock */
-    FILE *op;
-    char head_op[256]="sync_lc_conical",output_file_name[256]={"\0"};
-    sprintf(output_file_name,"%s%s",head_op,dat);
-    op = fopen(output_file_name,"w+");
-    fprintf(op,"# t_obs[s], nu_m[Hz], nu_c[c], F_nu_max[erg/s/cm^2/Hz] \n");
-    for (i=0;i<n_rbin;i++){
-        fprintf(op,"%le %le %le %le \n",t_obs[i],nu_m[i],nu_c[i],F_nu_max[i]);
-    }
-    fclose(op);
-}
 
 double sync_spec_conical(double nu, double nu_m, double nu_c, double F_nu_max, double gam_j, double B_f, double R_perp, double p, double z, double d_l)
 {
