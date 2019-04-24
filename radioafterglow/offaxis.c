@@ -31,15 +31,23 @@ const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 
 const int N_ne = 256;
 const int N_nph = 256; /* need to be the same as N_ne */
+const int N_mu = 32;
+
+const double GAMMA_ELEC_MIN = 1.0;/* minimum Lorentz factor of electron */
+const double GAMMA_ELEC_MAX = 2.0e9;/* maximum Lorentz factor of electron */
+const double ENE_PH_MIN_DIV_MeC2 = 1.0e-14;/* mimimum energy of photon in unit of electron mass */
+const double ENE_PH_MAX_DIV_MeC2 = 1.0;/* maximum energy of photon in unit of electron mass */
 
 const double ZETA_E = 0.4;
-const double FRAC_E = 0.1;
+const double FRAC_E = 0.01;
 const double XI_T = 0.24;
 const double POW_ELE = 2.0;
 
 
 void conical_model(double k, double A, double a, double b, double theta_j_0, double gam_j_0);
 void shocked_jet_conical(double k, double A, double theta_j_0, double E_j_0, double eps_B);
+void set_var(double mu[], double *del_mu, double gamma_e[], double dene_e[], double *del_ln_gamma_e, double gamma_ph[], double dene_ph[], double *del_ln_gamma_ph);
+void elec_injection(double t_sh, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[]);
 void sync_spec_para_conical(double z, double d_l, double k, double p);
 double sync_spec_conical(double nu, double nu_m, double nu_c, double F_nu_max, double gam_j, double B_f, double R_perp, double p, double z, double d_l);
 double syn_func_fit(double x);
@@ -77,6 +85,31 @@ int main()
     
     conical_model(k,A,a,b,theta_j_0,gam_j_0);
     shocked_jet_conical(k,A,theta_j_0,E_j_0,eps_B);
+    
+    int i=0;
+    double t_s[n_rbin],t_prime[n_rbin],gam_j[n_rbin],R_perp[n_rbin],R_para[n_rbin],theta_ene_ave[n_rbin],n_f[n_rbin],B_f[n_rbin],gam_e_th[n_rbin],gam_e_inj[n_rbin],gam_e_max[n_rbin];
+    FILE *ip;
+    char head_ip[256]="shock_acc_conical",dat[256]=".dat",input_file_name[256]={"\0"};
+    sprintf(input_file_name,"%s%s",head_ip,dat);
+    
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    while (fscanf(ip,"%le %le %le %le %le %le %le %le %le %le %le \n",
+           &t_s[i],&t_prime[i],&gam_j[i],&R_perp[i],&R_para[i],&theta_ene_ave[i],&n_f[i],&B_f[i],&gam_e_th[i],&gam_e_inj[i],&gam_e_max[i])!=EOF) {
+        i++;
+    }
+    fclose(ip);
+
+    /* setting variables */
+    double mu[N_mu],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],gam_ph[N_nph],dene_ph[N_nph];
+    double del_mu=0.0,del_ln_gam_e=0.0,del_ln_gam_ph=0.0;
+    set_var(mu,&del_mu,gam_e,dene_e,&del_ln_gam_e,gam_ph,dene_ph,&del_ln_gam_ph);
+    
+    i=1000;
+    elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
+    printf("%le %le %le %le %le \n",t_s[i],gam_j[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i]);
+    for (i=0;i<N_ne;i++)
+        printf("%le %le %le \n",gam_e[i],dne_dt_inj[i],n_f[0]/t_prime[0]);
     
     return 0;
 }
@@ -162,13 +195,44 @@ void shocked_jet_conical(double k, double A, double theta_j_0, double E_j_0, dou
                 t_s[i],t_prime[i],gam_j[i],R_perp[i],R_para[i],theta_ene_ave[i],n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
     }
     fclose(op);
-    
 }
 
 
 /* integration of Eqs. (2) and (4) of Granot, Piran, and Sari 99 */
 /* 先ずは愚直に1000time step分のP_nuとalpha_nuを吐いてみよう。*/
-void elec_injection(double tprime, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[])
+void set_var(double mu[], double *del_mu, double gamma_e[], double dene_e[], double *del_ln_gamma_e, double gamma_ph[], double dene_ph[], double *del_ln_gamma_ph)
+{
+    /* setting basic variables as strings */
+    
+    int i;
+    
+    /* electron energy in unit of MeC2 */
+    double del_ln_gamma_e_tmp = (log(GAMMA_ELEC_MAX)-log(GAMMA_ELEC_MIN))/(double)(N_ne-1);
+    for (i=0;i<N_ne;i++){
+        gamma_e[i] = GAMMA_ELEC_MIN*exp(del_ln_gamma_e_tmp*(double)i);
+        dene_e[i] = gamma_e[i]*MeC2*(exp(del_ln_gamma_e_tmp)-1.0);
+    }
+    *del_ln_gamma_e = del_ln_gamma_e_tmp;
+    
+    /* photon energy in unit of MeC2 */
+    double del_ln_gamma_ph_tmp = (log(ENE_PH_MAX_DIV_MeC2)-log(ENE_PH_MIN_DIV_MeC2))/(double)(N_nph-1);
+    for (i=0;i<N_nph;i++){
+        gamma_ph[i] = ENE_PH_MIN_DIV_MeC2*exp(del_ln_gamma_ph_tmp*(double)i);
+        dene_ph[i] = gamma_ph[i]*MeC2*(exp(del_ln_gamma_ph_tmp)-1.0);
+    }
+    *del_ln_gamma_ph = del_ln_gamma_ph_tmp;
+    
+    /* scattering angle */
+    double del_mu_tmp = 2.0/(double)(N_mu-1);
+    for (i=0;i<N_mu;i++){
+        mu[i] = -1.0+del_mu_tmp*(double)i;
+    }
+    *del_mu = del_mu_tmp;
+    
+}
+
+
+void elec_injection(double t_sh, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[])
 {
     double integ_th=0.0,integ_nth=0.0,gam_e_th_tmp=1.0;
     double del_ln_gam_th = log(gam_e_max)/(double)(N_ne-1);
@@ -187,7 +251,7 @@ void elec_injection(double tprime, double n_sh, double B_sh, double gam_e_inj, d
         integ_nth = log(gam_e_max/gam_e_inj);
     }
     
-    double dne_tot = n_sh/tprime;
+    double dne_tot = n_sh/t_sh;
     double norm_th = (1.0-FRAC_E)*dne_tot/integ_th;
     double norm_nth = FRAC_E*dne_tot/integ_nth;
     
