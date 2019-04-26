@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-const int n_rbin = 10000;
+const int n_rbin = 1000;
 
 const double E_c = 4.3e54; /* [erg] */
 const double M_c = 22.0*2e33; /* [g] */
@@ -29,29 +29,34 @@ const double YR = 365.0*24.0*60.0*60.0; /* [s]  */
 
 const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 
-const int N_ne = 256;
-const int N_nph = 256; /* need to be the same as N_ne */
+const int N_ne = 512;
+const int N_nph = 512; /* need to be the same as N_ne */
 const int N_mu = 32;
 
 const double GAMMA_ELEC_MIN = 1.0;/* minimum Lorentz factor of electron */
 const double GAMMA_ELEC_MAX = 2.0e9;/* maximum Lorentz factor of electron */
 const double ENE_PH_MIN_DIV_MeC2 = 1.0e-14;/* mimimum energy of photon in unit of electron mass */
-const double ENE_PH_MAX_DIV_MeC2 = 1.0;/* maximum energy of photon in unit of electron mass */
+const double ENE_PH_MAX_DIV_MeC2 = 1.0e3;/* maximum energy of photon in unit of electron mass */
 
-const double ZETA_E = 0.4;
-const double FRAC_E = 0.01;
+const double ZETA_E = 0.1;//0.4;
+const double FRAC_E = 1.0;//0.01;
 const double XI_T = 0.24;
 const double POW_ELE = 2.0;
 
 
 void conical_model(double k, double A, double a, double b, double theta_j_0, double gam_j_0);
 void shocked_jet_conical(double k, double A, double theta_j_0, double E_j_0, double eps_B);
-void set_var(double mu[], double *del_mu, double gamma_e[], double dene_e[], double *del_ln_gamma_e, double gamma_ph[], double dene_ph[], double *del_ln_gamma_ph);
+void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e, double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
 void elec_injection(double t_sh, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[]);
+double power_ad(double gam_e, double t);
+double power_syn(double gam_e, double B_sh);
+void elec_cooling(double t, double B_sh, double P_cool[], double gam_e[]);
+void elec_time_evolution(double dt, double gam_e[], double dene_e[], double ne_old[], double ne_new[], double dne_dt_inj[], double P_cool[]);
+
 void sync_spec_para_conical(double z, double d_l, double k, double p);
 double sync_spec_conical(double nu, double nu_m, double nu_c, double F_nu_max, double gam_j, double B_f, double R_perp, double p, double z, double d_l);
 double syn_func_fit(double x);
-void syn_spec(double B, double ne[], double gamma_e[], double dene_e[], double del_ln_gamma_e, double mu[], double del_mu, double gamma_ph[], double P_nu_syn[], double alpha_nu_syn[]);
+void syn_spec(double B, double dr, double ne[], double gamma_e[], double dene_e[], double del_ln_gamma_e, double gamma_ph[], double P_nu_syn[], double alpha_nu_syn[]);
 void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 int main()
@@ -86,7 +91,7 @@ int main()
     conical_model(k,A,a,b,theta_j_0,gam_j_0);
     shocked_jet_conical(k,A,theta_j_0,E_j_0,eps_B);
     
-    int i=0;
+    int i=0,j;
     double t_s[n_rbin],t_prime[n_rbin],gam_j[n_rbin],R_perp[n_rbin],R_para[n_rbin],theta_ene_ave[n_rbin],n_f[n_rbin],B_f[n_rbin],gam_e_th[n_rbin],gam_e_inj[n_rbin],gam_e_max[n_rbin];
     FILE *ip;
     char head_ip[256]="shock_acc_conical",dat[256]=".dat",input_file_name[256]={"\0"};
@@ -101,15 +106,27 @@ int main()
     fclose(ip);
 
     /* setting variables */
-    double mu[N_mu],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],gam_ph[N_nph],dene_ph[N_nph];
+    double mu[N_mu],ne[N_ne],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],P_cool[N_ne],gam_ph[N_nph],dene_ph[N_nph],P_nu_syn[N_nph],alpha_nu_syn[N_nph];
     double del_mu=0.0,del_ln_gam_e=0.0,del_ln_gam_ph=0.0;
-    set_var(mu,&del_mu,gam_e,dene_e,&del_ln_gam_e,gam_ph,dene_ph,&del_ln_gam_ph);
+    double dt=0.0,dr=0.0;
+    set_var(mu,&del_mu,ne,gam_e,dene_e,&del_ln_gam_e,gam_ph,dene_ph,&del_ln_gam_ph);
     
-    i=1000;
-    elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
-    printf("%le %le %le %le %le \n",t_s[i],gam_j[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i]);
-    for (i=0;i<N_ne;i++)
-        printf("%le %le %le \n",gam_e[i],dne_dt_inj[i],n_f[0]/t_prime[0]);
+    /* calculate emission intensity */
+    FILE *op;
+    op = fopen("test.dat","w+");
+    for (i=0;i<n_rbin-1;i++) {
+        printf("t = %lf [s]\n",t_s[i]);
+        elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
+        elec_cooling(t_prime[i],B_f[i],P_cool,gam_e);
+        dt = t_prime[i+1]-t_prime[i];
+        dr = (R_para[i+1]-R_para[i])/gam_j[i];
+        elec_time_evolution(dt,gam_e,dene_e,ne,ne,dne_dt_inj,P_cool);
+        syn_spec(B_f[i],dr,ne,gam_e,dene_e,del_ln_gam_e,gam_ph,P_nu_syn,alpha_nu_syn);
+        for (j=0;j<N_ne;j++){
+            fprintf(op,"%le %le %le %le %le %le \n",gam_e[j],dne_dt_inj[j],ne[j],gam_ph[j],P_nu_syn[j],alpha_nu_syn[j]);
+        }
+    }
+    fclose(op);
     
     return 0;
 }
@@ -200,27 +217,28 @@ void shocked_jet_conical(double k, double A, double theta_j_0, double E_j_0, dou
 
 /* integration of Eqs. (2) and (4) of Granot, Piran, and Sari 99 */
 /* 先ずは愚直に1000time step分のP_nuとalpha_nuを吐いてみよう。*/
-void set_var(double mu[], double *del_mu, double gamma_e[], double dene_e[], double *del_ln_gamma_e, double gamma_ph[], double dene_ph[], double *del_ln_gamma_ph)
+void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e, double gam_ph[], double dene_ph[], double *del_ln_gam_ph)
 {
     /* setting basic variables as strings */
     
     int i;
     
     /* electron energy in unit of MeC2 */
-    double del_ln_gamma_e_tmp = (log(GAMMA_ELEC_MAX)-log(GAMMA_ELEC_MIN))/(double)(N_ne-1);
+    double del_ln_gam_e_tmp = (log(GAMMA_ELEC_MAX)-log(GAMMA_ELEC_MIN))/(double)(N_ne-1);
     for (i=0;i<N_ne;i++){
-        gamma_e[i] = GAMMA_ELEC_MIN*exp(del_ln_gamma_e_tmp*(double)i);
-        dene_e[i] = gamma_e[i]*MeC2*(exp(del_ln_gamma_e_tmp)-1.0);
+        gam_e[i] = GAMMA_ELEC_MIN*exp(del_ln_gam_e_tmp*(double)i);
+        dene_e[i] = gam_e[i]*MeC2*(exp(del_ln_gam_e_tmp)-1.0);
+        ne[i] = 0.0;
     }
-    *del_ln_gamma_e = del_ln_gamma_e_tmp;
+    *del_ln_gam_e = del_ln_gam_e_tmp;
     
     /* photon energy in unit of MeC2 */
-    double del_ln_gamma_ph_tmp = (log(ENE_PH_MAX_DIV_MeC2)-log(ENE_PH_MIN_DIV_MeC2))/(double)(N_nph-1);
+    double del_ln_gam_ph_tmp = (log(ENE_PH_MAX_DIV_MeC2)-log(ENE_PH_MIN_DIV_MeC2))/(double)(N_nph-1);
     for (i=0;i<N_nph;i++){
-        gamma_ph[i] = ENE_PH_MIN_DIV_MeC2*exp(del_ln_gamma_ph_tmp*(double)i);
-        dene_ph[i] = gamma_ph[i]*MeC2*(exp(del_ln_gamma_ph_tmp)-1.0);
+        gam_ph[i] = ENE_PH_MIN_DIV_MeC2*exp(del_ln_gam_ph_tmp*(double)i);
+        dene_ph[i] = gam_ph[i]*MeC2*(exp(del_ln_gam_ph_tmp)-1.0);
     }
-    *del_ln_gamma_ph = del_ln_gamma_ph_tmp;
+    *del_ln_gam_ph = del_ln_gam_ph_tmp;
     
     /* scattering angle */
     double del_mu_tmp = 2.0/(double)(N_mu-1);
@@ -279,15 +297,14 @@ double power_syn(double gam_e, double B_sh)
 }
 
 
-void elec_cooling(double t, double B_sh,double t_ad[], double t_syn[], double P_ad[], double P_syn[], double P_cool[], double gam_e[])
+void elec_cooling(double t, double B_sh, double P_cool[], double gam_e[])
 {
+    double P_ad=0.0,P_syn=0.0;
     int i;
     for (i=0;i<N_ne;i++) {
-        P_ad[i] = power_ad(gam_e[i],t);
-        P_syn[i] = power_syn(gam_e[i],B_sh);
-        P_cool[i] = P_ad[i]+P_syn[i];
-        t_ad[i] = gam_e[i]*MeC2/P_ad[i];
-        t_syn[i] = gam_e[i]*MeC2/P_syn[i];
+        P_ad = power_ad(gam_e[i],t);
+        P_syn = power_syn(gam_e[i],B_sh);
+        P_cool[i] = P_ad+P_syn;
     }
 }
 
@@ -330,36 +347,37 @@ double syn_func_fit(double x)
 
 
 /* syncrotron emission power in the shocked jet rest frame */
-void syn_spec(double B, double ne[], double gamma_e[], double dene_e[], double del_ln_gamma_e, double mu[], double del_mu, double gamma_ph[], double P_nu_syn[], double alpha_nu_syn[])
+void syn_spec(double B, double dr, double ne[], double gam_e[], double dene_e[], double del_ln_gam_e, double gam_ph[], double P_nu_syn[], double alpha_nu_syn[])
 {
     int i,j,k;
-    double nu,x,sin_alpha;
-    double integ=0.0;
-    double integ_alpha=0.0;
+    double nu,x,sin_alpha,tau_sa;
+    double integ=0.0,integ_alpha=0.0;
     
+    sin_alpha = 2.0/3.0;
     for (k=0;k<N_nph;k++) {
-        nu = gamma_ph[k]*MeC2/H;
+        integ = 0.0;
+        integ_alpha = 0.0;
+        nu = gam_ph[k]*MeC2/H;
         for (i=0;i<N_ne;i++) {
-            //for (j=1;j<N_mu-1;j++) {
-            /* Do not take summation for j = 0 and j = N_mu where x = ∞ and syn_func = 0 */
-            //sin_alpha = sqrt(1.0-mu[j]*mu[j]);
-            sin_alpha = 2.0/3.0;
-            x= (2.0*M_PI*nu)/(3.0*ELEC*gamma_e[i]*gamma_e[i]*B/2.0/M_ELE/C*sin_alpha); /* Eq. (6.17c) of Rybicki & Lightman */
+            x= (2.0*M_PI*nu)/(3.0*ELEC*gam_e[i]*gam_e[i]*B/2.0/M_ELE/C*sin_alpha); /* Eq. (6.17c) of Rybicki & Lightman */
             if (i==0 || i==N_ne-1) {
-                //integ += 0.5*sin_alpha*ne[i]*syn_func_fit(x)*del_mu/2.0*gamma_e[i]*del_ln_gamma_e;
-                //integ_alpha += -0.5*sin_alpha*pow(gamma_e[i],2.0)*(-ne[i]/pow(gamma_e[i],2.0))/dene_e[i]*syn_func_fit(x)*del_mu/2.0*gamma_e[i]*del_ln_gamma_e/MeC2;
-                integ += 0.5*sin_alpha*ne[i]*syn_func_fit(x)*gamma_e[i]*del_ln_gamma_e;
-                integ_alpha += -0.5*sin_alpha*pow(gamma_e[i],2.0)*(-ne[i]/pow(gamma_e[i],2.0))/dene_e[i]*syn_func_fit(x)*gamma_e[i]*del_ln_gamma_e/MeC2;
+                integ += 0.5*ne[i]*gam_e[i]*del_ln_gam_e*syn_func_fit(x);
+                integ_alpha += -0.5*sin_alpha*pow(gam_e[i],2.0)*(-ne[i]/pow(gam_e[i],2.0))/dene_e[i]*syn_func_fit(x)*gam_e[i]*del_ln_gam_e/MeC2;
             } else {
-                //integ += sin_alpha*ne[i]*syn_func_fit(x)*del_mu/2.0*gamma_e[i]*del_ln_gamma_e;
-                //integ_alpha += -sin_alpha*pow(gamma_e[i],2.0)*(ne[i+1]/pow(gamma_e[i+1],2.0)-ne[i]/pow(gamma_e[i],2.0))/dene_e[i]*syn_func_fit(x)*del_mu/2.0*gamma_e[i]*del_ln_gamma_e/MeC2;
-                integ += sin_alpha*ne[i]*syn_func_fit(x)*gamma_e[i]*del_ln_gamma_e;
-                integ_alpha += -sin_alpha*pow(gamma_e[i],2.0)*(ne[i+1]/pow(gamma_e[i+1],2.0)-ne[i]/pow(gamma_e[i],2.0))/dene_e[i]*syn_func_fit(x)*gamma_e[i]*del_ln_gamma_e/MeC2;
+                integ += ne[i]*gam_e[i]*del_ln_gam_e*syn_func_fit(x);
+                integ_alpha += -sin_alpha*pow(gam_e[i],2.0)*(ne[i+1]/pow(gam_e[i+1],2.0)-ne[i]/pow(gam_e[i],2.0))/dene_e[i]*syn_func_fit(x)*gam_e[i]*del_ln_gam_e/MeC2;
             }
-            //}
         }
-        P_nu_syn[k] = sqrt(3.0)*pow(ELEC,3.0)*B/MeC2*integ; /* Eq. (6.33) x (2 pi) of Rybicki & Lightman */
+        P_nu_syn[k] = sqrt(3.0)*pow(ELEC,3.0)*B*sin_alpha/MeC2*integ; /* Eq. (6.33) x (2 pi) of Rybicki & Lightman */
         alpha_nu_syn[k] = C*C/8.0/M_PI/nu/nu*sqrt(3.0)*pow(ELEC,3.0)*B*integ_alpha; /* Eq. (6.52) of Rybicki & Lightman */
+        
+        tau_sa = alpha_nu_syn[k]*dr;
+        
+        if (tau_sa > 1.0e-6)
+            P_nu_syn[k] = (1.0-exp(-tau_sa))*P_nu_syn[k]/tau_sa;
+        
+        integ = 0.0;
+        integ_alpha = 0.0;
     }
 }
 
