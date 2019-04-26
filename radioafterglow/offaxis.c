@@ -195,24 +195,25 @@ void calc_shocked_jet(char path[256], double k, double A, double theta_j_0, doub
     }
     fclose(ip);
     
-    double R_para[N_tbin],R_perp[N_tbin],theta_ene_ave[N_tbin];
+    double R_para[N_tbin],R_perp[N_tbin],theta_ene_ave[N_tbin],n_amb[N_tbin];
     double R_j = pow((3.0-k)*E_j_0/2.0/M_PI/A/C/C,1.0/(3.0-k));
-    double n_amb;
-    
-    
-    /* calculating the physical parameters at the (forward) shock downstream*/
-    double n_f[N_tbin],B_f[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin],gam_e_th[N_tbin];
     
     for (i=0;i<N_tbin;i++){
         t[i] = R_j*t[i]/C;
         t_s[i] = R_j*t_s[i]/C; /* source rest frame */
         t_prime[i] = t_s[i]/gam_j[i]; /* jet rest frame */
+        n_amb[i] = A*pow(R_para[i],-k)/M_PRO;
         R_perp[i] = R_j*r[i]*(2.0*theta_j[i]-sin(2.0*theta_j[i]))/2.0/M_PI/(1.0-cos(theta_j[i]));
         R_para[i] = R_j*r[i]*sin(theta_j[i])*sin(theta_j[i])/2.0/(1.0-cos(theta_j[i]));
         theta_ene_ave[i] = (sin(theta_j[i])-theta_j[i]*cos(theta_j[i]))/(1.0-cos(theta_j[i]));
-        n_amb = A*pow(R_para[i],-k)/M_PRO;
-        n_f[i] = 4.0*gam_j[i]*n_amb;
-        B_f[i] = sqrt(32.0*M_PI*eps_B*M_PRO*n_amb*gam_j[i]*(gam_j[i]-1.0))*C;
+    }
+    
+    /* calculating the physical parameters at the (forward) shock downstream*/
+    double n_f[N_tbin],B_f[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin],gam_e_th[N_tbin];
+    
+    for (i=0;i<N_tbin;i++){
+        n_f[i] = 4.0*gam_j[i]*n_amb[i];
+        B_f[i] = sqrt(32.0*M_PI*eps_B*M_PRO*n_amb[i]*gam_j[i]*(gam_j[i]-1.0))*C;
         gam_e_th[i] = XI_T*M_PRO/M_ELE*(gam_j[i]-1.0);
         gam_e_inj[i] = ZETA_E*M_PRO/M_ELE*(gam_j[i]-1.0);
         gam_e_max[i] = sqrt(9.0*M_PI*ELEC/10.0/SIGMA_T/B_f[i]);
