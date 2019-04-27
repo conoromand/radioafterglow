@@ -27,6 +27,33 @@ const double YR = 365.0*24.0*60.0*60.0; /* [s]  */
 
 const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 
+
+
+/* input parameters */
+/////////////////////////////////////////
+/* Ambient density profile */
+const double v_w_str=2.0e8;
+const double Mdot_str=1.0e-4*M_SUN/YR;
+const double k=2.0;
+const double A=Mdot_str/4.0/M_PI/v_w_str;
+//const double k=0.0;
+//const double A=0.1*M_PRO;
+const double a=1.0; /* see Granot & Piran 2011 */
+const double b=0.45; /* see Granot & Piran 2011 */
+/* redshift */
+const double z = 0.1;
+/* jet parameters  */
+const double theta_j_0=2.0*M_PI*5.0/360.0;
+const double gam_j_0=200.0;
+/* shock parameters */
+const double eps_B = 0.001;
+const double eps_e = 0.01;
+const double p = 2.2;
+const double ZETA_E = 0.1;//0.4;
+const double FRAC_E = 1.0;//0.01;
+const double XI_T = 0.24;
+const double POW_ELE = 2.0;
+
 const int N_tbin = 1000;
 const int N_ne = 512;
 const int N_nph = 512; /* need to be the same as N_ne */
@@ -37,14 +64,16 @@ const double GAMMA_ELEC_MAX = 2.0e9;/* maximum Lorentz factor of electron */
 const double ENE_PH_MIN_DIV_MeC2 = 1.0e-14;/* mimimum energy of photon in unit of electron mass */
 const double ENE_PH_MAX_DIV_MeC2 = 1.0e3;/* maximum energy of photon in unit of electron mass */
 
-const double ZETA_E = 0.1;//0.4;
-const double FRAC_E = 1.0;//0.01;
-const double XI_T = 0.24;
-const double POW_ELE = 2.0;
+/* path */
+const char path[256]="/Users/kakashi/offaxis_data/";
+/////////////////////////////////////////
 
 
-void calc_conical_model(char path[256], double k, double A, double a, double b, double theta_j_0, double gam_j_0);
-void calc_shocked_jet(char path[256], double k, double A, double theta_j_0, double E_j_0, double eps_B);
+void calc_conical_model();
+void calc_jet();
+void calc_shocked_jet();
+void calc_sync_map();
+
 void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e, double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
 void elec_injection(double t_sh, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[]);
 double power_ad(double gam_e, double t);
@@ -53,100 +82,22 @@ void elec_cooling(double t, double B_sh, double P_cool[], double gam_e[]);
 void elec_time_evolution(double dt, double gam_e[], double dene_e[], double ne_old[], double ne_new[], double dne_dt_inj[], double P_cool[]);
 double syn_func_fit(double x);
 void syn_spec(double B, double dr, double ne[], double gamma_e[], double dene_e[], double del_ln_gamma_e, double gamma_ph[], double P_nu_syn[], double alpha_nu_syn[]);
+
 void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 
 int main()
 {
-    /* input parameters */
-    /////////////////////////////////////////
-    /* Ambient density profile */
-    double v_w_str=2.0e8;
-    double Mdot_str=1.0e-4*M_SUN/YR;
-    double k=2.0;
-    double A=Mdot_str/4.0/M_PI/v_w_str;
-    //double k=0.0;
-    //double A=0.1*M_PRO;
-    double a=1.0; /* see Granot & Piran 2011 */
-    double b=0.45; /* see Granot & Piran 2011 */
-    /* redshift */
-    double z = 0.1;
-    /* jet parameters  */
-    double theta_j_0=2.0*M_PI*5.0/360.0;
-    double gam_j_0=200.0;
-    double E_j_0=1.0e55*(1.0-cos(theta_j_0));
-    /* shock parameters */
-    double eps_B = 0.001;
-    double eps_e = 0.01;
-    double p = 2.2;
-    /* path */
-    char path[256]="/Users/kakashi/offaxis_data/";
-    /////////////////////////////////////////
-    
-    
-    /* setting variables */
-    /////////////////////////////////////////
-    double mu[N_mu],ne[N_ne],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],P_cool[N_ne],gam_ph[N_nph],dene_ph[N_nph],P_nu_syn[N_nph],alpha_nu_syn[N_nph];
-    double del_mu=0.0,del_ln_gam_e=0.0,del_ln_gam_ph=0.0;
-    double dt=0.0,dr=0.0;
-    set_var(mu,&del_mu,ne,gam_e,dene_e,&del_ln_gam_e,gam_ph,dene_ph,&del_ln_gam_ph);
-    /////////////////////////////////////////
-
-    
-    calc_conical_model(path,k,A,a,b,theta_j_0,gam_j_0);
-    calc_shocked_jet(path,k,A,theta_j_0,E_j_0,eps_B);
-    
-    
-    int i=0,j;
-    double t_s[N_tbin],t_prime[N_tbin],gam_j[N_tbin],R_perp[N_tbin],R_para[N_tbin],theta_ene_ave[N_tbin],n_f[N_tbin],B_f[N_tbin],gam_e_th[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin];
-    FILE *ip;
-    char head_ip[256]="shock_acc_conical",dat[256]=".dat",input_file_name[256]={"\0"};
-    sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
-    
-    ip = fopen(input_file_name,"r");
-    fscanf(ip,"%*[^\n]");
-    while (fscanf(ip,"%le %le %le %le %le %le %le %le %le %le %le \n",
-           &t_s[i],&t_prime[i],&gam_j[i],&R_perp[i],&R_para[i],&theta_ene_ave[i],&n_f[i],&B_f[i],&gam_e_th[i],&gam_e_inj[i],&gam_e_max[i])!=EOF) {
-        i++;
-    }
-    fclose(ip);
-
-    /* calculate emission intensity */
-    FILE *op1,*op2;
-    char head1[256]="map_ne",head2[256]="map_pnu",output_file_name1[256]={"\0"},output_file_name2[256]={"\0"};
-    sprintf(output_file_name1,"%s%s%s",path,head1,dat);
-    sprintf(output_file_name2,"%s%s%s",path,head2,dat);
-    op1 = fopen(output_file_name1,"w+");
-    op2 = fopen(output_file_name2,"w+");
-    for (i=0;i<N_tbin-1;i++) {
-        printf("t = %12.3e [s]\n",t_s[i]);
-        elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
-        elec_cooling(t_prime[i],B_f[i],P_cool,gam_e);
-        dt = t_prime[i+1]-t_prime[i];
-        dr = (R_para[i+1]-R_para[i])/(4.0*gam_j[i]);
-        elec_time_evolution(dt,gam_e,dene_e,ne,ne,dne_dt_inj,P_cool);
-        syn_spec(B_f[i],dr,ne,gam_e,dene_e,del_ln_gam_e,gam_ph,P_nu_syn,alpha_nu_syn);
-        for (j=0;j<N_ne;j++){
-            fprintf(op1,"%le ",ne[j]);
-        }
-        fprintf(op1,"\n");
-        for (j=0; j<N_nph; j++) {
-            fprintf(op2,"%le ",P_nu_syn[j]);
-        }
-        fprintf(op2,"\n");
-    }
-    fclose(op1);
-    fclose(op2);
-    
-    
-    double d_h=0.0,d_c=0.0,d_a=0.0,d_l=0.0;
-    distances(z,&d_h,&d_c,&d_a,&d_l);
+    calc_conical_model();
+    calc_jet();
+    calc_shocked_jet();
+    calc_sync_map();
     
     return 0;
 }
 
 
-void calc_conical_model(char path[256], double k, double A, double a, double b, double theta_j_0, double gam_j_0)
+void calc_conical_model()
 {
     FILE *op;
     char head[256]="conical_model",dat[256]=".dat",output_file_name[256]={"\0"};
@@ -178,10 +129,8 @@ void calc_conical_model(char path[256], double k, double A, double a, double b, 
 }
 
 
-void calc_shocked_jet(char path[256], double k, double A, double theta_j_0, double E_j_0, double eps_B)
+void calc_jet()
 {
-    int i=0;
-    
     /* reading the input file of the jet dynamics */
     double r[N_tbin],t[N_tbin],t_s[N_tbin],t_prime[N_tbin],theta_j[N_tbin],gam_j[N_tbin];
     FILE *ip;
@@ -190,23 +139,58 @@ void calc_shocked_jet(char path[256], double k, double A, double theta_j_0, doub
     
     ip = fopen(input_file_name,"r");
     fscanf(ip,"%*[^\n]");
+    int i=0;
     while (fscanf(ip,"%le %le %le %le %*le %le \n",&r[i],&t[i],&t_s[i],&theta_j[i],&gam_j[i])!=EOF) {
         i++;
     }
     fclose(ip);
     
-    double R_para[N_tbin],R_perp[N_tbin],theta_ene_ave[N_tbin],n_amb[N_tbin];
-    double R_j = pow((3.0-k)*E_j_0/2.0/M_PI/A/C/C,1.0/(3.0-k));
     
+    /* calculate jet parameter */
+    double R_para[N_tbin],R_perp[N_tbin],theta_ene_ave[N_tbin],n_amb[N_tbin];
+    double E_j_0=1.0e55*(1.0-cos(theta_j_0));
+    double R_j = pow((3.0-k)*E_j_0/2.0/M_PI/A/C/C,1.0/(3.0-k));
     for (i=0;i<N_tbin;i++){
         t[i] = R_j*t[i]/C;
         t_s[i] = R_j*t_s[i]/C; /* source rest frame */
         t_prime[i] = t_s[i]/gam_j[i]; /* jet rest frame */
-        n_amb[i] = A*pow(R_para[i],-k)/M_PRO;
         R_perp[i] = R_j*r[i]*(2.0*theta_j[i]-sin(2.0*theta_j[i]))/2.0/M_PI/(1.0-cos(theta_j[i]));
         R_para[i] = R_j*r[i]*sin(theta_j[i])*sin(theta_j[i])/2.0/(1.0-cos(theta_j[i]));
         theta_ene_ave[i] = (sin(theta_j[i])-theta_j[i]*cos(theta_j[i]))/(1.0-cos(theta_j[i]));
+        n_amb[i] = A*pow(R_para[i],-k)/M_PRO;
     }
+    
+    
+    /* outputting the microphysics parameters at the shock */
+    FILE *op;
+    char head_op[256]="conical_jet",output_file_name[256]={"\0"};
+    sprintf(output_file_name,"%s%s%s",path,head_op,dat);
+    op = fopen(output_file_name,"w+");
+    fprintf(op,"# t_s[s], t_prime[s], gam_j, R_perp[cm], R_para[cm], theta_j, n_amb[cm^-3]\n");
+    for (i=0;i<N_tbin;i++){
+        fprintf(op,"%le %le %le %le %le %le %le \n",
+                t_s[i],t_prime[i],gam_j[i],R_perp[i],R_para[i],theta_ene_ave[i],n_amb[i]);
+    }
+    fclose(op);
+    
+}
+
+
+void calc_shocked_jet()
+{
+    /* reading the input file of the jet dynamics */
+    double gam_j[N_tbin],n_amb[N_tbin];
+    FILE *ip;
+    char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
+    sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    int i=0;
+    while (fscanf(ip,"%*le %*le %le %*le %*le %*le %le \n",&gam_j[i],&n_amb[i])!=EOF) {
+        i++;
+    }
+    fclose(ip);
+    
     
     /* calculating the physical parameters at the (forward) shock downstream*/
     double n_f[N_tbin],B_f[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin],gam_e_th[N_tbin];
@@ -219,15 +203,16 @@ void calc_shocked_jet(char path[256], double k, double A, double theta_j_0, doub
         gam_e_max[i] = sqrt(9.0*M_PI*ELEC/10.0/SIGMA_T/B_f[i]);
     }
     
+    
     /* outputting the microphysics parameters at the shock */
     FILE *op;
     char head_op[256]="shock_acc_conical",output_file_name[256]={"\0"};
     sprintf(output_file_name,"%s%s%s",path,head_op,dat);
     op = fopen(output_file_name,"w+");
-    fprintf(op,"# t_s[s], t_prime[s], gam_j, R_perp[cm], R_para[cm], theta_j, n_f[cm^-3], B_f[G], gam_e_th, gam_e_inj, gam_e_max \n");
+    fprintf(op,"# n_f[cm^-3], B_f[G], gam_e_th, gam_e_inj, gam_e_max \n");
     for (i=0;i<N_tbin;i++){
-        fprintf(op,"%le %le %le %le %le %le %le %le %le %le %le \n",
-                t_s[i],t_prime[i],gam_j[i],R_perp[i],R_para[i],theta_ene_ave[i],n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
+        fprintf(op,"%le %le %le %le %le \n",
+                n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
     }
     fclose(op);
 }
@@ -235,8 +220,6 @@ void calc_shocked_jet(char path[256], double k, double A, double theta_j_0, doub
 
 void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e, double gam_ph[], double dene_ph[], double *del_ln_gam_ph)
 {
-    /* setting basic variables as strings */
-    
     /* electron energy in unit of MeC2 */
     int i;
     double del_ln_gam_e_tmp = (log(GAMMA_ELEC_MAX)-log(GAMMA_ELEC_MIN))/(double)(N_ne-1);
@@ -394,6 +377,69 @@ void syn_spec(double B, double dr, double ne[], double gam_e[], double dene_e[],
         integ = 0.0;
         integ_alpha = 0.0;
     }
+}
+
+
+void calc_sync_map()
+{
+    int i=0,j;
+    double t_s[N_tbin],t_prime[N_tbin],gam_j[N_tbin],R_para[N_tbin],n_f[N_tbin],B_f[N_tbin],gam_e_th[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin];
+    FILE *ip;
+    
+    char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
+    sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    while (fscanf(ip,"%le %le %le %*le %le %*le %*le \n",
+                  &t_s[i],&t_prime[i],&gam_j[i],&R_para[i])!=EOF){
+        i++;
+    }
+    fclose(ip);
+    i=0;
+    
+    char head_ip2[256] ="shock_acc_conical";
+    sprintf(input_file_name,"%s%s%s",path,head_ip2,dat);
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    while (fscanf(ip,"%le %le %le %le %le \n",
+                  &n_f[i],&B_f[i],&gam_e_th[i],&gam_e_inj[i],&gam_e_max[i])!=EOF){
+        i++;
+    }
+    fclose(ip);
+    
+    /* setting variables */
+    double mu[N_mu],ne[N_ne],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],P_cool[N_ne],gam_ph[N_nph],dene_ph[N_nph],P_nu_syn[N_nph],alpha_nu_syn[N_nph];
+    double del_mu=0.0,del_ln_gam_e=0.0,del_ln_gam_ph=0.0;
+    double dt=0.0,dr=0.0;
+    set_var(mu,&del_mu,ne,gam_e,dene_e,&del_ln_gam_e,gam_ph,dene_ph,&del_ln_gam_ph);
+    
+    /* calculate emission intensity */
+    FILE *op1,*op2;
+    char head1[256]="map_ne",head2[256]="map_pnu",output_file_name1[256]={"\0"},output_file_name2[256]={"\0"};
+    sprintf(output_file_name1,"%s%s%s",path,head1,dat);
+    sprintf(output_file_name2,"%s%s%s",path,head2,dat);
+    op1 = fopen(output_file_name1,"w+");
+    op2 = fopen(output_file_name2,"w+");
+    for (i=0;i<N_tbin-1;i++) {
+        printf("t = %12.3e [s]\n",t_s[i]);
+        elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
+        elec_cooling(t_prime[i],B_f[i],P_cool,gam_e);
+        dt = t_prime[i+1]-t_prime[i];
+        dr = (R_para[i+1]-R_para[i])/(4.0*gam_j[i]);
+        elec_time_evolution(dt,gam_e,dene_e,ne,ne,dne_dt_inj,P_cool);
+        syn_spec(B_f[i],dr,ne,gam_e,dene_e,del_ln_gam_e,gam_ph,P_nu_syn,alpha_nu_syn);
+        for (j=0;j<N_ne;j++){
+            fprintf(op1,"%le ",ne[j]);
+        }
+        fprintf(op1,"\n");
+        for (j=0; j<N_nph; j++) {
+            fprintf(op2,"%le ",P_nu_syn[j]);
+        }
+        fprintf(op2,"\n");
+    }
+    fclose(op1);
+    fclose(op2);
+    
 }
 
 
