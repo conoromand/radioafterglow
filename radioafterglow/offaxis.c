@@ -28,7 +28,7 @@ const double YR = 365.0*24.0*60.0*60.0; /* [s]  */
 const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 
 
-
+/////////////////////////////////////////
 /* input parameters */
 /////////////////////////////////////////
 /* Ambient density profile */
@@ -55,7 +55,7 @@ const double XI_T = 0.24;
 const double POW_ELE = 2.0;
 
 const int N_tbin = 1000;
-const int N_ne = 512;
+const int N_ne = 512;   /* need to be the same as N_nph */
 const int N_nph = 512; /* need to be the same as N_ne */
 const int N_mu = 32;
 
@@ -74,7 +74,10 @@ void calc_jet();
 void calc_shocked_jet();
 void calc_sync_map();
 
-void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e, double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
+void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e);
+void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
+void set_integ_base_mu(double mu[], double *del_mu);
+
 void elec_injection(double t_sh, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[]);
 double power_ad(double gam_e, double t);
 double power_syn(double gam_e, double B_sh);
@@ -88,14 +91,45 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 int main()
 {
-    calc_conical_model();
-    calc_jet();
-    calc_shocked_jet();
-    calc_sync_map();
+    //calc_conical_model();
+    //calc_jet();
+    //calc_shocked_jet();
+    //calc_sync_map();
+    
+    int i,j;
+    double ne_list[N_tbin][N_ne],Pnu_list[N_tbin][N_nph];
+    
+    FILE *ip1,*ip2;
+    char head1[256]="map_ne",head2[256]="map_pnu",dat[256]=".dat",input_file_name1[256]={"\0"},input_file_name2[256]={"\0"};
+    sprintf(input_file_name1,"%s%s%s",path,head1,dat);
+    sprintf(input_file_name2,"%s%s%s",path,head2,dat);
+    ip1 = fopen(input_file_name1,"r");
+    ip2 = fopen(input_file_name2,"r");
+    
+    for (i=0; i<N_tbin-1; i++) {
+        for (j=0; j<N_ne; j++) {
+            fscanf(ip1,"%le ",&ne_list[i][j]);
+        }
+        fscanf(ip1,"\n");
+    }
+    fclose(ip1);
+    for (i=0; i<N_tbin-1; i++) {
+        for (j=0; j<N_nph; j++) {
+            fscanf(ip2,"%le ",&Pnu_list[i][j]);
+        }
+        fscanf(ip2,"\n");
+    }
+    fclose(ip2);
     
     return 0;
 }
 
+
+//For a given nu and Tobs, first calculate an "egg shape", i.e., relation between mu and r
+void egg_shape(double nuobs, double tobs, double r_egg[])
+{
+    
+}
 
 void calc_conical_model()
 {
@@ -218,7 +252,70 @@ void calc_shocked_jet()
 }
 
 
-void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e, double gam_ph[], double dene_ph[], double *del_ln_gam_ph)
+void calc_sync_map()
+{
+    int i=0,j;
+    double t_s[N_tbin],t_prime[N_tbin],gam_j[N_tbin],R_para[N_tbin],n_f[N_tbin],B_f[N_tbin],gam_e_th[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin];
+    FILE *ip;
+    
+    char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
+    sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    while (fscanf(ip,"%le %le %le %*le %le %*le %*le \n",
+                  &t_s[i],&t_prime[i],&gam_j[i],&R_para[i])!=EOF){
+        i++;
+    }
+    fclose(ip);
+    i=0;
+    
+    char head_ip2[256] ="shock_acc_conical";
+    sprintf(input_file_name,"%s%s%s",path,head_ip2,dat);
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    while (fscanf(ip,"%le %le %le %le %le \n",
+                  &n_f[i],&B_f[i],&gam_e_th[i],&gam_e_inj[i],&gam_e_max[i])!=EOF){
+        i++;
+    }
+    fclose(ip);
+    
+    /* setting variables */
+    double ne[N_ne],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],P_cool[N_ne],gam_ph[N_nph],dene_ph[N_nph],P_nu_syn[N_nph],alpha_nu_syn[N_nph];
+    double del_ln_gam_e=0.0,del_ln_gam_ph=0.0;
+    double dt=0.0,dr=0.0;
+    set_integ_base_ne(ne,gam_e,dene_e,&del_ln_gam_e);
+    set_integ_base_pnu(gam_ph,dene_ph,&del_ln_gam_ph);
+    
+    /* calculate emission intensity */
+    FILE *op1,*op2;
+    char head1[256]="map_ne",head2[256]="map_pnu",output_file_name1[256]={"\0"},output_file_name2[256]={"\0"};
+    sprintf(output_file_name1,"%s%s%s",path,head1,dat);
+    sprintf(output_file_name2,"%s%s%s",path,head2,dat);
+    op1 = fopen(output_file_name1,"w+");
+    op2 = fopen(output_file_name2,"w+");
+    for (i=0;i<N_tbin-1;i++) {
+        printf("t = %12.3e [s]\n",t_s[i]);
+        elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
+        elec_cooling(t_prime[i],B_f[i],P_cool,gam_e);
+        dt = t_prime[i+1]-t_prime[i];
+        dr = (R_para[i+1]-R_para[i])/(4.0*gam_j[i]);
+        elec_time_evolution(dt,gam_e,dene_e,ne,ne,dne_dt_inj,P_cool);
+        syn_spec(B_f[i],dr,ne,gam_e,dene_e,del_ln_gam_e,gam_ph,P_nu_syn,alpha_nu_syn);
+        for (j=0;j<N_ne;j++){
+            fprintf(op1,"%le ",ne[j]);
+        }
+        fprintf(op1,"\n");
+        for (j=0; j<N_nph; j++) {
+            fprintf(op2,"%le ",P_nu_syn[j]);
+        }
+        fprintf(op2,"\n");
+    }
+    fclose(op1);
+    fclose(op2);
+    
+}
+
+void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e)
 {
     /* electron energy in unit of MeC2 */
     int i;
@@ -230,7 +327,12 @@ void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double de
     }
     *del_ln_gam_e = del_ln_gam_e_tmp;
     
+}
+
+void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph)
+{
     /* photon energy in unit of MeC2 */
+    int i;
     double del_ln_gam_ph_tmp = (log(ENE_PH_MAX_DIV_MeC2)-log(ENE_PH_MIN_DIV_MeC2))/(double)(N_nph-1);
     for (i=0;i<N_nph;i++){
         gam_ph[i] = ENE_PH_MIN_DIV_MeC2*exp(del_ln_gam_ph_tmp*(double)i);
@@ -238,7 +340,12 @@ void set_var(double mu[], double *del_mu, double ne[], double gam_e[], double de
     }
     *del_ln_gam_ph = del_ln_gam_ph_tmp;
     
+}
+
+void set_integ_base_mu(double mu[], double *del_mu)
+{
     /* scattering angle */
+    int i;
     double del_mu_tmp = 2.0/(double)(N_mu-1);
     for (i=0;i<N_mu;i++){
         mu[i] = -1.0+del_mu_tmp*(double)i;
@@ -378,70 +485,6 @@ void syn_spec(double B, double dr, double ne[], double gam_e[], double dene_e[],
         integ_alpha = 0.0;
     }
 }
-
-
-void calc_sync_map()
-{
-    int i=0,j;
-    double t_s[N_tbin],t_prime[N_tbin],gam_j[N_tbin],R_para[N_tbin],n_f[N_tbin],B_f[N_tbin],gam_e_th[N_tbin],gam_e_inj[N_tbin],gam_e_max[N_tbin];
-    FILE *ip;
-    
-    char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
-    sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
-    ip = fopen(input_file_name,"r");
-    fscanf(ip,"%*[^\n]");
-    while (fscanf(ip,"%le %le %le %*le %le %*le %*le \n",
-                  &t_s[i],&t_prime[i],&gam_j[i],&R_para[i])!=EOF){
-        i++;
-    }
-    fclose(ip);
-    i=0;
-    
-    char head_ip2[256] ="shock_acc_conical";
-    sprintf(input_file_name,"%s%s%s",path,head_ip2,dat);
-    ip = fopen(input_file_name,"r");
-    fscanf(ip,"%*[^\n]");
-    while (fscanf(ip,"%le %le %le %le %le \n",
-                  &n_f[i],&B_f[i],&gam_e_th[i],&gam_e_inj[i],&gam_e_max[i])!=EOF){
-        i++;
-    }
-    fclose(ip);
-    
-    /* setting variables */
-    double mu[N_mu],ne[N_ne],gam_e[N_ne],dene_e[N_ne],dne_dt_inj[N_ne],P_cool[N_ne],gam_ph[N_nph],dene_ph[N_nph],P_nu_syn[N_nph],alpha_nu_syn[N_nph];
-    double del_mu=0.0,del_ln_gam_e=0.0,del_ln_gam_ph=0.0;
-    double dt=0.0,dr=0.0;
-    set_var(mu,&del_mu,ne,gam_e,dene_e,&del_ln_gam_e,gam_ph,dene_ph,&del_ln_gam_ph);
-    
-    /* calculate emission intensity */
-    FILE *op1,*op2;
-    char head1[256]="map_ne",head2[256]="map_pnu",output_file_name1[256]={"\0"},output_file_name2[256]={"\0"};
-    sprintf(output_file_name1,"%s%s%s",path,head1,dat);
-    sprintf(output_file_name2,"%s%s%s",path,head2,dat);
-    op1 = fopen(output_file_name1,"w+");
-    op2 = fopen(output_file_name2,"w+");
-    for (i=0;i<N_tbin-1;i++) {
-        printf("t = %12.3e [s]\n",t_s[i]);
-        elec_injection(t_prime[i],n_f[i],B_f[i],gam_e_inj[i],gam_e_th[i],gam_e_max[i],gam_e,dne_dt_inj);
-        elec_cooling(t_prime[i],B_f[i],P_cool,gam_e);
-        dt = t_prime[i+1]-t_prime[i];
-        dr = (R_para[i+1]-R_para[i])/(4.0*gam_j[i]);
-        elec_time_evolution(dt,gam_e,dene_e,ne,ne,dne_dt_inj,P_cool);
-        syn_spec(B_f[i],dr,ne,gam_e,dene_e,del_ln_gam_e,gam_ph,P_nu_syn,alpha_nu_syn);
-        for (j=0;j<N_ne;j++){
-            fprintf(op1,"%le ",ne[j]);
-        }
-        fprintf(op1,"\n");
-        for (j=0; j<N_nph; j++) {
-            fprintf(op2,"%le ",P_nu_syn[j]);
-        }
-        fprintf(op2,"\n");
-    }
-    fclose(op1);
-    fclose(op2);
-    
-}
-
 
 void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l)
 {
