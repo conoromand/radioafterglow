@@ -1,19 +1,10 @@
-やること: 
-off axis jetの計算、特にviewing angleによるlight curveの違い
-
-使う式：
-もっとも一般的にはEqs. (2) and (4) of Granot, Piran, and Sari 99
+references：
+Granot, Piran, and Sari 99 (GPS99)
+Granot and Piran 12 (GP12)
 
 大まかな計算の流れ：
-1. まずjetのdynamicsを計算 --> Gamma(t), R(t), theta(t)
-2. それに付随してemissivityを計算 --> P'_nu(nu',r,t) (注: 各tでtheta(t)の外側ではP'_nu(nu',r,t) = 0)
-3. 1.と2.をr, mu方向に十分密に切って用意してする.
-4. Eqs. (2) and (4)に従って積分を実行
-
-
-懸念:
-メモリめっちゃ食う？
-
-方策；
-まず3までをtableに吐き出すコードを書く。んで、そのあとにtableを使って積分を実行？
-荒くなるかもしれないけど、一旦この方針で行ってみよう...
+1. GP12のモデルを使ってjetのdynamicsを計算 --> Gamma(t), R(t), theta(t)
+2. 1.からshocked regionの電子加速とsync.emissivityを計算 --> P'_nu(nu',r,t) (注: 各tでtheta(t)の外側ではP'_nu(nu',r,t) = 0)
+3. GPS99のEq. (2)に従って、given nu_obs,T_obsに対する"egg shape"を求める。
+4. 3.で求めたegg shapeに従ってGPS99のEq. (4)の積分を実行。
+5. 4.を繰り返してlight curve or spectrumを計算。
