@@ -74,6 +74,8 @@ void calc_jet();
 void calc_shocked_jet();
 void calc_sync_map();
 
+void egg_shape(double tobs, double z);
+
 void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e);
 void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
 void set_integ_base_mu(double mu[], double *del_mu);
@@ -96,6 +98,7 @@ int main()
     //calc_shocked_jet();
     //calc_sync_map();
     
+    /*
     int i,j;
     double ne_list[N_tbin][N_ne],Pnu_list[N_tbin][N_nph];
     
@@ -120,14 +123,40 @@ int main()
         fscanf(ip2,"\n");
     }
     fclose(ip2);
+    */
+    
+    double tobs = 1.0e5,z=1.0;
+    egg_shape(tobs,z);
     
     return 0;
 }
 
 
-//For a given nu and Tobs, first calculate an "egg shape", i.e., relation between mu and r
-void egg_shape(double nuobs, double tobs, double r_egg[])
+//For a given (Tobs,z) and jet dynamics, calculate an "egg shape" retion that contributes to the observed flux
+void egg_shape(double tobs, double z)
 {
+    /* reading the input file of the jet dynamics */
+    double t_s[N_tbin],R_para[N_tbin];
+    FILE *ip;
+    char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
+    sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
+    ip = fopen(input_file_name,"r");
+    fscanf(ip,"%*[^\n]");
+    int i=0;
+    while (fscanf(ip,"%le %*le %*le %*le %le %*le %*le \n",&t_s[i],&R_para[i])!=EOF) {
+        i++;
+    }
+    fclose(ip);
+    
+    double mu[N_mu];
+    double del_mu;
+    set_integ_base_mu(mu,&del_mu);
+    
+    int j = 31;
+    for (i=0; i<N_tbin; i++) {
+        printf("%12.3e %12.3e \n",mu[j],tobs/(1.+z)/(t_s[i]-R_para[i]*mu[j]/C)-1.);
+    }
+    
     
 }
 
