@@ -152,9 +152,9 @@ void egg_shape(double tobs, double z)
     double del_mu;
     set_integ_base_mu(mu,&del_mu);
     
-    int j = 31;
+    int j = 16;
     for (i=0; i<N_tbin; i++) {
-        printf("%12.3e %12.3e \n",mu[j],tobs/(1.+z)/(t_s[i]-R_para[i]*mu[j]/C)-1.);
+        printf("%12.3e %12.3e %12.3e \n",mu[j],t_s[i],R_para[i]/C);
     }
     
     
