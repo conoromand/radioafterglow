@@ -33,8 +33,8 @@ const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 /////////////////////////////////////////
 /* Ambient density profile */
 const double rfs_min = 1.0e12; /* minimum radius of the free expansion phase in unit of [cm] */
-const double v_w_str=2.0e8;
-const double Mdot_str=1.0e-4*M_SUN/YR;
+const double v_w_str=1.0e8;
+const double Mdot_str=1.0e-5*M_SUN/YR;
 const double k=2.0;
 const double A=Mdot_str/4.0/M_PI/v_w_str;
 //const double k=0.0;
@@ -63,7 +63,7 @@ const int N_mu = 64;
 const double GAMMA_ELEC_MIN = 1.0;/* minimum Lorentz factor of electron */
 const double GAMMA_ELEC_MAX = 2.0e9;/* maximum Lorentz factor of electron */
 const double ENE_PH_MIN_DIV_MeC2 = 1.0e-14;/* mimimum energy of photon in unit of electron mass */
-const double ENE_PH_MAX_DIV_MeC2 = 1.0e3;/* maximum energy of photon in unit of electron mass */
+const double ENE_PH_MAX_DIV_MeC2 = 1.0e-4;/* maximum energy of photon in unit of electron mass */
 
 /* path */
 const char path[256]="/Users/kakashi/offaxis_data/";
@@ -75,7 +75,7 @@ void calc_jet();
 void calc_shocked_jet();
 void calc_sync_map();
 
-void egg_shape(double nuobs, double tobs, double z);
+void egg_shape(double nuobs, double tobs, double z, double beam_fac[], double Regg[], int time_index[], int nu_index[]);
 
 void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e);
 void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
@@ -100,7 +100,7 @@ int main()
     calc_shocked_jet();
     calc_sync_map();
     */
-     
+    
     /*
     int i,j;
     double ne_list[N_tbin][N_ne],Pnu_list[N_tbin][N_nph];
@@ -128,15 +128,17 @@ int main()
     fclose(ip2);
     */
     
-    double nuobs=1.0e9,tobs = 2.0e7,z=.1;
-    egg_shape(nuobs,tobs,z);
-    
+    double nuobs=1.0e9,tobs = 2.0e3,z=.1;
+    double beam_fac[N_mu],Regg[N_mu];
+    int time_index[N_mu],nu_index[N_mu];
+    egg_shape(nuobs,tobs,z,beam_fac,Regg,time_index,nu_index);
+
     return 0;
 }
 
 
 //For a given (Tobs,z) and jet dynamics, calculate an "egg shape" retion that contributes to the observed flux
-void egg_shape(double nuobs, double tobs, double z)
+void egg_shape(double nuobs, double tobs, double z, double beam_fac[], double Regg[], int time_index[], int nu_index[])
 {
     /* reading the input file of the jet dynamics */
     double t[2*N_tbin],t_s[2*N_tbin],gam_j[2*N_tbin],R[2*N_tbin],R_para[2*N_tbin];
@@ -152,36 +154,33 @@ void egg_shape(double nuobs, double tobs, double z)
     fclose(ip);
     
     
-    int j;
-    double mu[N_mu],Regg[N_mu],beam_fac[N_mu],nu_debeam[N_mu];
-    int time_index[N_mu],nu_index[N_mu];
-    double del_mu;
+    int j,k;
+    double mu[N_mu],gam_ph[N_nph],dene_ph[N_nph];
+    double del_mu,del_ln_gam_ph,nu_debeam;
     set_integ_base_mu(mu,&del_mu);
+    set_integ_base_pnu(gam_ph,dene_ph,&del_ln_gam_ph);
     for (j=0; j<N_mu; j++) {
+        /* determine time index */
         i=0;
         while ((t[i]-mu[j]*R[i]/C) < tobs/(1.+z) && i<2*N_tbin){
             i++;
         }
-        //printf("%12.3e \n",(t[i]-mu[j]*R[i]/C)/(tobs/(1.+z)));
-        if (i == 0 || i == 2*N_tbin){
-            Regg[j] = 0.0;
-        } else {
-            Regg[j] = R[i];
-        }
+        //if (i == 0 || i == 2*N_tbin){
+        //    Regg[j] = 0.0;
+        //} else {
+        Regg[j] = R[i];
+        //}
         time_index[j] = i;
-        beam_fac[j] = gam_j[i]*gam_j[i]*pow(1.-sqrt(1.-1./gam_j[i]/gam_j[i])*mu[j],2.0);
-        nu_debeam[j] = nuobs*gam_j[i]*(1.-sqrt(1.-1./gam_j[i]/gam_j[i])*mu[j]);
+        beam_fac[j] = gam_j[i]*(1.-sqrt(1.-1./gam_j[i]/gam_j[i])*mu[j]);
+        
+        /* determine nu index */
+        nu_debeam = nuobs*beam_fac[j];
+        k=0;
+        while (gam_ph[k]*MeC2/H < nu_debeam && k<N_nph){
+            k++;
+        }
+        nu_index[j] = k;
     }
-    
-    
-    FILE *op;
-    char head_op[256]="egg",output_file_name[256]={"\0"};
-    sprintf(output_file_name,"%s%s%s",path,head_op,dat);
-    op = fopen(output_file_name,"w");
-    for (i=0; i<N_mu; i++) {
-        fprintf(op,"%12.3e %12.3e %d %12.3e %12.3e \n",mu[i],Regg[i],time_index[i],beam_fac[i],nu_debeam[i]);
-    }
-    fclose(op);
     
 }
 
