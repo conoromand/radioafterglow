@@ -55,7 +55,7 @@ const double FRAC_E = 1.0;//0.01;
 const double XI_T = 0.24;
 const double POW_ELE = 2.0;
 
-const int N_tbin = 500;
+const int N_tbin = 512;
 const int N_ne = 512;   /* need to be the same as N_nph */
 const int N_nph = 512; /* need to be the same as N_ne */
 const int N_mu = 64;
@@ -75,7 +75,7 @@ void calc_jet();
 void calc_shocked_jet();
 void calc_sync_map();
 
-void egg_shape(double nuobs, double tobs, double z, double beam_fac[], double Regg[], int time_index[], int nu_index[]);
+void egg_shape(double nuobs, double tobs, double z);
 
 void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e);
 void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
@@ -131,14 +131,19 @@ int main()
     double nuobs=1.0e9,tobs = 2.0e3,z=.1;
     double beam_fac[N_mu],Regg[N_mu];
     int time_index[N_mu],nu_index[N_mu];
-    egg_shape(nuobs,tobs,z,beam_fac,Regg,time_index,nu_index);
+    egg_shape(nuobs,tobs,z);
 
+    //int i;
+    //for (i=0; i<N_mu; i++) {
+    //    printf("%d \n",time_index[i]);
+    //}
+    
     return 0;
 }
 
 
 //For a given (Tobs,z) and jet dynamics, calculate an "egg shape" retion that contributes to the observed flux
-void egg_shape(double nuobs, double tobs, double z, double beam_fac[], double Regg[], int time_index[], int nu_index[])
+void egg_shape(double nuobs, double tobs, double z)
 {
     /* reading the input file of the jet dynamics */
     double t[2*N_tbin],t_s[2*N_tbin],gam_j[2*N_tbin],R[2*N_tbin],R_para[2*N_tbin];
@@ -154,32 +159,49 @@ void egg_shape(double nuobs, double tobs, double z, double beam_fac[], double Re
     fclose(ip);
     
     
-    int j,k;
-    double mu[N_mu],gam_ph[N_nph],dene_ph[N_nph];
-    double del_mu,del_ln_gam_ph,nu_debeam;
-    set_integ_base_mu(mu,&del_mu);
+    /* find the minimum and maximum time indices */
+    i = 0;
+    int time_index_min,time_index_max;
+    double mu_integ[2*N_tbin],dmu_integ[2*N_tbin],beam_fac[2*N_tbin],vol_fac[2*N_tbin];
+    while ((t[i]+R[i]/C) < tobs/(1.+z)){
+        i++;
+    }
+    time_index_min = i;
+    while ((t[i]-R[i]/C) < tobs/(1.+z)){
+        i++;
+    }
+    time_index_max = i;
+    int N_mu_integ = time_index_max-time_index_min;
+    for (i=0; i<2*N_tbin; i++) {
+        dmu_integ[i] = 0.;
+        if (i >= time_index_min && i < time_index_max){
+            mu_integ[i] = (t[i]-tobs/(1.+z))*C/R[i];
+            beam_fac[i] = gam_j[i]*(1.-sqrt(1.-1./gam_j[i]/gam_j[i])*mu_integ[i]);
+            vol_fac[i] = R[i]*R[i]*(R[i+1]-R[i]);
+        } else {
+            mu_integ[i] = 2.; /* returning nan with acos() */
+            beam_fac[i] = 1.;
+            vol_fac[i] = 0.;
+        }
+    }
+    
+    /* find the nu index */
+    int j,nu_index=0;
+    double gam_ph[N_nph],dene_ph[N_nph];
+    double del_ln_gam_ph=0.0;
     set_integ_base_pnu(gam_ph,dene_ph,&del_ln_gam_ph);
-    for (j=0; j<N_mu; j++) {
-        /* determine time index */
-        i=0;
-        while ((t[i]-mu[j]*R[i]/C) < tobs/(1.+z) && i<2*N_tbin){
-            i++;
+    for (i=time_index_min; i<time_index_max; i++) {
+        j=0;
+        while (MeC2*gam_ph[j]/H < nuobs*beam_fac[i]) {
+            j++;
         }
-        //if (i == 0 || i == 2*N_tbin){
-        //    Regg[j] = 0.0;
-        //} else {
-        Regg[j] = R[i];
-        //}
-        time_index[j] = i;
-        beam_fac[j] = gam_j[i]*(1.-sqrt(1.-1./gam_j[i]/gam_j[i])*mu[j]);
-        
-        /* determine nu index */
-        nu_debeam = nuobs*beam_fac[j];
-        k=0;
-        while (gam_ph[k]*MeC2/H < nu_debeam && k<N_nph){
-            k++;
+        nu_index = j;
+        if (i == time_index_min){
+            dmu_integ[i] = mu_integ[i]+1;
+        } else {
+            dmu_integ[i] = mu_integ[i]-mu_integ[i-1];
         }
-        nu_index[j] = k;
+        printf("%d %lf %lf %lf %12.3e %d %12.3e \n",i,mu_integ[i],dmu_integ[i],beam_fac[i],vol_fac[i],nu_index,(MeC2*gam_ph[nu_index]/H)/(nuobs*beam_fac[i]));
     }
     
 }
