@@ -591,6 +591,7 @@ void syn_spec(double B, double dr, double ne[], double gam_e[], double dene_e[],
     }
 }
 
+
 void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l)
 {
   int i,n_int=100000;
