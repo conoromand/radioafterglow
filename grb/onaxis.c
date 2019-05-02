@@ -103,7 +103,7 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 int main()
 {
-    double nuobs = 1.0e8;
+    double nuobs = 1.0e11;
     /*
     calc_conical_model();
     calc_jet();
@@ -173,14 +173,14 @@ void calc_lightcurve(double nuobs)
 void egg_shape(double nuobs, double tobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[])
 {
     /* reading the input file of the jet dynamics */
-    double t[2*N_tbin],gam_j[2*N_tbin],R[2*N_tbin];
+    double t[2*N_tbin],gam_j[2*N_tbin],R[2*N_tbin],theta_j[2*N_tbin];
     FILE *ip;
     char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
     sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
     ip = fopen(input_file_name,"r");
     fscanf(ip,"%*[^\n]");
     int i=0,j;
-    while (fscanf(ip,"%le %*le %le %le %*le %*le %*le %*le \n",&t[i],&gam_j[i],&R[i])!=EOF) {
+    while (fscanf(ip,"%le %*le %le %le %*le %*le %le %*le \n",&t[i],&gam_j[i],&R[i],&theta_j[i])!=EOF) {
         i++;
     }
     fclose(ip);
@@ -224,10 +224,12 @@ void egg_shape(double nuobs, double tobs, double mu_integ[], double dmu_integ[],
             j++;
         }
         nu_index[i] = j;
-        if (i == time_index_min_tmp){
-            dmu_integ[i] = mu_integ[i]+1;
-        } else {
-            dmu_integ[i] = mu_integ[i]-mu_integ[i-1];
+        if (mu_integ[i] > cos(theta_j[i]) || mu_integ[i] < -cos(theta_j[i])){
+            if (i == time_index_min_tmp){
+                dmu_integ[i] = mu_integ[i]+1;
+            } else {
+                dmu_integ[i] = mu_integ[i]-mu_integ[i-1];
+            }
         }
     }
     
