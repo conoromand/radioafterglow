@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 
 const double E_c = 4.3e54; /* [erg] */
@@ -41,11 +42,14 @@ const double A=Mdot_str/4.0/M_PI/v_w_str;
 //const double A=0.1*M_PRO;
 const double a=1.0; /* see Granot & Piran 2011 */
 const double b=0.45; /* see Granot & Piran 2011 */
+
 /* redshift */
 const double z = 0.1;
+
 /* jet parameters  */
 const double theta_j_0=2.0*M_PI*5.0/360.0;
 const double gam_j_0=200.0;
+
 /* shock parameters */
 const double eps_B = 0.001;
 const double eps_e = 0.01;
@@ -55,9 +59,9 @@ const double FRAC_E = 1.0;//0.01;
 const double XI_T = 0.24;
 const double POW_ELE = 2.0;
 
-const int N_tbin = 512;
-const int N_ne = 512;   /* need to be the same as N_nph */
-const int N_nph = 512; /* need to be the same as N_ne */
+const int N_tbin = 1024;
+const int N_ne = 1024;   /* need to be the same as N_nph */
+const int N_nph = 1024; /* need to be the same as N_ne */
 
 const int N_tobsbin = 128;
 const double tobs_min=3.0e3;
@@ -71,6 +75,7 @@ const double ENE_PH_MAX_DIV_MeC2 = 1.0e-4;/* maximum energy of photon in unit of
 /* path */
 const char path[256]="/Users/kakashi/offaxis_data/";
 /////////////////////////////////////////
+
 
 
 void calc_conical_model();
@@ -95,6 +100,7 @@ void syn_spec(double B, double dr, double ne[], double gamma_e[], double dene_e[
 void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 
+
 int main()
 {
     double nuobs = 1.0e8;
@@ -116,10 +122,15 @@ void calc_lightcurve(double nuobs)
     double d_h,d_c,d_a,d_l;
     distances(z,&d_h,&d_c,&d_a,&d_l);
     
-    int i,j;
-    double Pnu_list[2*N_tbin][N_nph];
-    
     /* get Pnu map */
+    int i,j;
+    int rows=2*N_tbin-1;
+    int columns=N_nph;
+    double **Pnu_list = (double**)malloc(rows*sizeof(double*));
+    Pnu_list[0]=(double*)malloc(rows*columns*sizeof(double));
+    for(i=0;i<rows;i++){
+        Pnu_list[i]=Pnu_list[0]+i*columns;
+    }
     FILE *ip;
     char head[256]="map_pnu",dat[256]=".dat",input_file_name[256]={"\0"};
     sprintf(input_file_name,"%s%s%s",path,head,dat);
@@ -149,13 +160,13 @@ void calc_lightcurve(double nuobs)
         egg_shape(nuobs,tobs,mu_integ,dmu_integ,beam_fac,vol_fac,&time_index_min,&time_index_max,nu_index);
         for (j=time_index_min;j<time_index_max;j++) {
             integ += Pnu_list[j][nu_index[j]]/pow(beam_fac[j],2.0)*vol_fac[j]*dmu_integ[j];
-            //printf("%d %lf %lf %lf %12.3e %d %12.3e \n",i,mu_integ[i],dmu_integ[i],beam_fac[i],vol_fac[i],nu_index[i],Pnu_list[i][nu_index[i]]);
         }
         Fnuobs = (1.+z)/(2.*d_l*d_l)*integ;
         fprintf(op,"%le %le \n",tobs,Fnuobs);
         integ=0.;
     }
     fclose(op);
+    free(Pnu_list);
 }
 
 
