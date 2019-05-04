@@ -104,12 +104,11 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 int main()
 {
     double nuobs = 1.0e11;
-    /*
+    
     calc_conical_model();
     calc_jet();
     calc_shocked_jet();
     calc_sync_map();
-    */
     calc_lightcurve(nuobs);
     
     return 0;

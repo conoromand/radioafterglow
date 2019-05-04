@@ -106,7 +106,6 @@ int main()
     double nuobs = 1.0e11;
     double thetaobs = 2.0*M_PI*30.0/360.0;
     
-    
     calc_conical_model();
     calc_jet();
     calc_shocked_jet();
