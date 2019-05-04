@@ -59,9 +59,9 @@ const double FRAC_E = 1.0;//0.01;
 const double XI_T = 0.24;
 const double POW_ELE = 2.0;
 
-const int N_tbin = 1024;
-const int N_ne = 1024;   /* need to be the same as N_nph */
-const int N_nph = 1024; /* need to be the same as N_ne */
+const int N_tbin = 2048;
+const int N_ne = 2048;   /* need to be the same as N_nph */
+const int N_nph = 2048; /* need to be the same as N_ne */
 
 const int N_tobsbin = 128;
 const double tobs_min=3.0e3;
@@ -104,13 +104,13 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 int main()
 {
     double nuobs = 1.0e11;
-    double thetaobs = 2.0*M_PI*0.0/360.0;
-    /*
+    double thetaobs = 2.0*M_PI*30.0/360.0;
+    
+    
     calc_conical_model();
     calc_jet();
     calc_shocked_jet();
     calc_sync_map();
-    */
     calc_lightcurve(nuobs,thetaobs);
     
     return 0;
@@ -123,7 +123,7 @@ void calc_lightcurve(double nuobs, double thetaobs)
     double d_h,d_c,d_a,d_l;
     distances(z,&d_h,&d_c,&d_a,&d_l);
     
-    /* get Pnu map */
+    /* load Pnu */
     int i,j;
     int rows=2*N_tbin-1;
     int columns=N_nph;
@@ -144,14 +144,14 @@ void calc_lightcurve(double nuobs, double thetaobs)
     }
     fclose(ip);
     
-    /* get egg shape */
+    /* load egg shape */
     double del_ln_tobs=(log(tobs_max)-log(tobs_min))/(double)(N_tobsbin-1),tobs,Fnuobs =0.0;
     double mu_integ[2*N_tbin],dmu_integ[2*N_tbin],beam_fac[2*N_tbin],vol_fac[2*N_tbin];
     int time_index_min,time_index_max;
     int nu_index[2*N_tbin];
     double integ=0.;
 
-    /* outputting the lightcurve */
+    /* integrate Pnu along with the egg shape and output the lightcurve */
     FILE *op;
     char head_op[256]="lc",output_file_name[256]={"\0"};
     sprintf(output_file_name,"%s%s_%1.1e%s",path,head_op,nuobs,dat);
@@ -173,7 +173,7 @@ void calc_lightcurve(double nuobs, double thetaobs)
 
 void egg_shape(double nuobs, double tobs, double thetaobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[])
 {
-    /* reading the input file of the jet dynamics */
+    /* load jet dynamics */
     double t[2*N_tbin],gam_j[2*N_tbin],R[2*N_tbin],theta_j[2*N_tbin];
     FILE *ip;
     char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
@@ -215,18 +215,19 @@ void egg_shape(double nuobs, double tobs, double thetaobs, double mu_integ[], do
     *time_index_min = time_index_min_tmp;
     *time_index_max = time_index_max_tmp;
     
-    /* find the nu index */
     double gam_ph[N_nph],dene_ph[N_nph];
     double del_ln_gam_ph=0.0,dphi=0.0;
     set_integ_base_pnu(gam_ph,dene_ph,&del_ln_gam_ph);
     for (i=time_index_min_tmp; i<time_index_max_tmp; i++) {
+        /* find the nu index */
         j=0;
         while (MeC2*gam_ph[j]/H < nuobs*beam_fac[i]) {
             j++;
         }
         nu_index[i] = j;
         
-        if (mu_integ[i] < 0.){
+        /* define the edge of the "egg" */
+        if (mu_integ[i] < 0.){  /* counter jet */
             if ( M_PI - thetaobs + theta_j[i] < acos(mu_integ[i]) || M_PI - thetaobs - theta_j[i] > acos(mu_integ[i]) ) {
                 dphi = 0.;
             } else if (theta_j[i] - thetaobs + acos(mu_integ[i]) < M_PI){
@@ -244,15 +245,12 @@ void egg_shape(double nuobs, double tobs, double thetaobs, double mu_integ[], do
             }
         }
         
-        //printf("%d %12.3e %12.3e %12.3e %12.3e \n",i,180.*acos(mu_integ[i])/M_PI,180.*theta_j[i]/M_PI,180.*thetaobs/M_PI,dphi);
         if (i == time_index_min_tmp){
             dmu_integ[i] = (mu_integ[i]+1.)*(dphi/2./M_PI);
         } else {
             dmu_integ[i] = (mu_integ[i]-mu_integ[i-1])*(dphi/2./M_PI);
         }
     }
-    //printf("\n");
-
     
 }
 
