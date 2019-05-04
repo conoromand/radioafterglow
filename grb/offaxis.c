@@ -82,9 +82,9 @@ void calc_conical_model();
 void calc_jet();
 void calc_shocked_jet();
 void calc_sync_map();
-void calc_lightcurve(double nuobs);
+void calc_lightcurve(double nuobs, double thetaobs);
 
-void egg_shape(double nuobs, double tobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[]);
+void egg_shape(double nuobs, double tobs, double thetaobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[]);
 
 void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e);
 void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
@@ -104,19 +104,20 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 int main()
 {
     double nuobs = 1.0e11;
+    double thetaobs = 2.0*M_PI*0.0/360.0;
     /*
     calc_conical_model();
     calc_jet();
     calc_shocked_jet();
     calc_sync_map();
     */
-    calc_lightcurve(nuobs);
+    calc_lightcurve(nuobs,thetaobs);
     
     return 0;
 }
 
 
-void calc_lightcurve(double nuobs)
+void calc_lightcurve(double nuobs, double thetaobs)
 {
     /* calculate luminosity distance */
     double d_h,d_c,d_a,d_l;
@@ -157,7 +158,7 @@ void calc_lightcurve(double nuobs)
     op = fopen(output_file_name,"w+");
     for (i=0; i<N_tobsbin; i++) {
         tobs=tobs_min*exp(del_ln_tobs*(double)i);
-        egg_shape(nuobs,tobs,mu_integ,dmu_integ,beam_fac,vol_fac,&time_index_min,&time_index_max,nu_index);
+        egg_shape(nuobs,tobs,thetaobs,mu_integ,dmu_integ,beam_fac,vol_fac,&time_index_min,&time_index_max,nu_index);
         for (j=time_index_min;j<time_index_max;j++) {
             integ += Pnu_list[j][nu_index[j]]/pow(beam_fac[j],2.0)*vol_fac[j]*dmu_integ[j];
         }
@@ -170,7 +171,7 @@ void calc_lightcurve(double nuobs)
 }
 
 
-void egg_shape(double nuobs, double tobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[])
+void egg_shape(double nuobs, double tobs, double thetaobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[])
 {
     /* reading the input file of the jet dynamics */
     double t[2*N_tbin],gam_j[2*N_tbin],R[2*N_tbin],theta_j[2*N_tbin];
@@ -216,22 +217,42 @@ void egg_shape(double nuobs, double tobs, double mu_integ[], double dmu_integ[],
     
     /* find the nu index */
     double gam_ph[N_nph],dene_ph[N_nph];
-    double del_ln_gam_ph=0.0;
+    double del_ln_gam_ph=0.0,dphi=0.0;
     set_integ_base_pnu(gam_ph,dene_ph,&del_ln_gam_ph);
     for (i=time_index_min_tmp; i<time_index_max_tmp; i++) {
-        if (mu_integ[i] > cos(theta_j[i]) || mu_integ[i] < -cos(theta_j[i])){
-            j=0;
-            while (MeC2*gam_ph[j]/H < nuobs*beam_fac[i]) {
-                j++;
-            }
-            nu_index[i] = j;
-            if (i == time_index_min_tmp){
-                dmu_integ[i] = mu_integ[i]+1;
+        j=0;
+        while (MeC2*gam_ph[j]/H < nuobs*beam_fac[i]) {
+            j++;
+        }
+        nu_index[i] = j;
+        
+        if (mu_integ[i] < 0.){
+            if ( M_PI - thetaobs + theta_j[i] < acos(mu_integ[i]) || M_PI - thetaobs - theta_j[i] > acos(mu_integ[i]) ) {
+                dphi = 0.;
+            } else if (theta_j[i] - thetaobs + acos(mu_integ[i]) < M_PI){
+                dphi = 2.*acos((cos(theta_j[i]) + mu_integ[i]*cos(thetaobs))/fabs(sqrt(1.-mu_integ[i]*mu_integ[i]))/sin(thetaobs));
             } else {
-                dmu_integ[i] = mu_integ[i]-mu_integ[i-1];
+                dphi = 2.*M_PI;
+            }
+        } else {
+            if ( thetaobs - theta_j[i] > acos(mu_integ[i]) || thetaobs + theta_j[i] < acos(mu_integ[i]) ) {
+                dphi = 0.;
+            } else if ( thetaobs + acos(mu_integ[i]) - theta_j[i] > 0. ){
+                dphi = 2.*acos((cos(theta_j[i])-mu_integ[i]*cos(thetaobs))/sqrt(1.-mu_integ[i]*mu_integ[i])/sin(thetaobs));
+            } else {
+                dphi = 2.*M_PI;
             }
         }
+        
+        //printf("%d %12.3e %12.3e %12.3e %12.3e \n",i,180.*acos(mu_integ[i])/M_PI,180.*theta_j[i]/M_PI,180.*thetaobs/M_PI,dphi);
+        if (i == time_index_min_tmp){
+            dmu_integ[i] = (mu_integ[i]+1.)*(dphi/2./M_PI);
+        } else {
+            dmu_integ[i] = (mu_integ[i]-mu_integ[i-1])*(dphi/2./M_PI);
+        }
     }
+    //printf("\n");
+
     
 }
 
