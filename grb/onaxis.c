@@ -103,13 +103,13 @@ void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
 
 int main()
 {
-    double nuobs = 1.0e11;
-    /*
+    double nuobs = 1.0e8;
+    
     calc_conical_model();
     calc_jet();
     calc_shocked_jet();
     calc_sync_map();
-    */
+    
     calc_lightcurve(nuobs);
     
     return 0;
@@ -219,12 +219,12 @@ void egg_shape(double nuobs, double tobs, double mu_integ[], double dmu_integ[],
     double del_ln_gam_ph=0.0;
     set_integ_base_pnu(gam_ph,dene_ph,&del_ln_gam_ph);
     for (i=time_index_min_tmp; i<time_index_max_tmp; i++) {
-        j=0;
-        while (MeC2*gam_ph[j]/H < nuobs*beam_fac[i]) {
-            j++;
-        }
-        nu_index[i] = j;
         if (mu_integ[i] > cos(theta_j[i]) || mu_integ[i] < -cos(theta_j[i])){
+            j=0;
+            while (MeC2*gam_ph[j]/H < nuobs*beam_fac[i]) {
+                j++;
+            }
+            nu_index[i] = j;
             if (i == time_index_min_tmp){
                 dmu_integ[i] = mu_integ[i]+1;
             } else {
@@ -332,14 +332,14 @@ void calc_jet()
 void calc_shocked_jet()
 {
     /* reading the input file of the jet dynamics */
-    double gam_j[2*N_tbin],n_amb[2*N_tbin];
+    double t[2*N_tbin],t_j[2*N_tbin],gam_j[2*N_tbin],n_amb[2*N_tbin];
     FILE *ip;
     char head_ip[256]="conical_jet",dat[256]=".dat",input_file_name[256]={"\0"};
     sprintf(input_file_name,"%s%s%s",path,head_ip,dat);
     ip = fopen(input_file_name,"r");
     fscanf(ip,"%*[^\n]");
     int i=0;
-    while (fscanf(ip,"%*le %*le %le %*le %*le %*le %*le %le \n",&gam_j[i],&n_amb[i])!=EOF) {
+    while (fscanf(ip,"%le %le %le %*le %*le %*le %*le %le \n",&t[i],&t_j[i],&gam_j[i],&n_amb[i])!=EOF) {
         i++;
     }
     fclose(ip);
@@ -364,8 +364,8 @@ void calc_shocked_jet()
     op = fopen(output_file_name,"w+");
     fprintf(op,"# n_f[cm^-3], B_f[G], gam_e_th, gam_e_inj, gam_e_max \n");
     for (i=0;i<2*N_tbin;i++){
-        fprintf(op,"%le %le %le %le %le \n",
-                n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
+        fprintf(op,"%le %le %le %le %le %le %le \n",
+                t[i],t_j[i],n_f[i],B_f[i],gam_e_th[i],gam_e_inj[i],gam_e_max[i]);
     }
     fclose(op);
 }
@@ -392,7 +392,7 @@ void calc_sync_map()
     sprintf(input_file_name,"%s%s%s",path,head_ip2,dat);
     ip = fopen(input_file_name,"r");
     fscanf(ip,"%*[^\n]");
-    while (fscanf(ip,"%le %le %le %le %le \n",
+    while (fscanf(ip,"%*le %*le %le %le %le %le %le \n",
                   &n_f[i],&B_f[i],&gam_e_th[i],&gam_e_inj[i],&gam_e_max[i])!=EOF){
         i++;
     }
