@@ -2,39 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "physcon.h"
-
-
-/////////////////////////////////////////
-/* input parameter */
-/////////////////////////////////////////
-/* frequency in the observer frame */
-const double nuobs = 1.0e11;
-/* observer angle */
-const double thetaobs = 2.0*M_PI*30.0/360.0;
-/* redshift */
-const double z = 0.1;
-
-const int N_tbin = 2048;
-const int N_nph = 2048;
-
-const int N_tobsbin = 128;
-const double tobs_min=3.0e3;
-const double tobs_max=3.0e8;
-
-const double ENE_PH_MIN_DIV_MeC2 = 1.0e-14;/* mimimum energy of photon in unit of electron mass */
-const double ENE_PH_MAX_DIV_MeC2 = 1.0e-4;/* maximum energy of photon in unit of electron mass */
-
-
-/* path */
-const char path[256]="/Users/kakashi/offaxis_data/wind-5/G200thetaj5/";
-/////////////////////////////////////////
-
-
-void calc_lightcurve(double nuobs, double thetaobs);
-
-void egg_shape(double nuobs, double tobs, double thetaobs, double mu_integ[], double dmu_integ[], double beam_fac[], double vol_fac[], int *time_index_min, int *time_index_max, int nu_index[]);
-void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
-void distances(double z, double *d_h, double *d_c, double *d_a, double *d_l);
+#include "input.h"
+#include "funclist.h"
 
 
 int main()

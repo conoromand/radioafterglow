@@ -2,46 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "physcon.h"
-
-
-/////////////////////////////////////////
-/* input parameter */
-/////////////////////////////////////////
-/* shock parameters */
-const double eps_B = 0.001;
-const double eps_e = 0.01;
-const double p = 2.2;
-const double ZETA_E = 0.1;//0.4;
-const double FRAC_E = 1.0;//0.01;
-const double XI_T = 0.24;
-const double POW_ELE = 2.0;
-
-const int N_tbin = 2048;
-const int N_ne = 2048;   /* need to be the same as N_nph */
-const int N_nph = 2048; /* need to be the same as N_ne */
-
-const double GAMMA_ELEC_MIN = 1.0;/* minimum Lorentz factor of electron */
-const double GAMMA_ELEC_MAX = 2.0e9;/* maximum Lorentz factor of electron */
-const double ENE_PH_MIN_DIV_MeC2 = 1.0e-14;/* mimimum energy of photon in unit of electron mass */
-const double ENE_PH_MAX_DIV_MeC2 = 1.0e-4;/* maximum energy of photon in unit of electron mass */
-
-/* path */
-const char path[256]="/Users/kakashi/offaxis_data/wind-5/G200thetaj5/";
-/////////////////////////////////////////
-
-
-void calc_shocked_jet();
-void calc_sync_map();
-
-void set_integ_base_ne(double ne[], double gam_e[], double dene_e[], double *del_ln_gam_e);
-void set_integ_base_pnu(double gam_ph[], double dene_ph[], double *del_ln_gam_ph);
-void elec_injection(double t_sh, double n_sh, double B_sh, double gam_e_inj, double gam_e_th, double gam_e_max, double gam_e[], double dne_dt_inj[]);
-double power_ad(double gam_e, double t);
-double power_syn(double gam_e, double B_sh);
-void elec_cooling(double t, double B_sh, double P_cool[], double gam_e[]);
-void elec_time_evolution(double dt, double gam_e[], double dene_e[], double ne_old[], double ne_new[], double dne_dt_inj[], double P_cool[]);
-double syn_func_fit(double x);
-void syn_spec(double B, double dr, double ne[], double gamma_e[], double dene_e[], double del_ln_gamma_e, double gamma_ph[], double P_nu_syn[], double alpha_nu_syn[]);
+#include "input.h"
+#include "funclist.h"
 
 
 int main()

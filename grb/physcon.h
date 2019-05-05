@@ -4,9 +4,6 @@
 /////////////////////////////////////////
 /* physical constant */
 /////////////////////////////////////////
-const double E_c = 4.3e54; /* [erg] */
-const double M_c = 22.0*2e33; /* [g] */
-const double R_c = 2.0e13; /* [cm] */
 const double kappa = 0.35; /* [cm^2 g^{-1}] */
 const double T_ion = 6000; /* [K] */
 

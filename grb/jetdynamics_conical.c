@@ -2,36 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "physcon.h"
-
-
-/////////////////////////////////////////
-/* input parameter */
-/////////////////////////////////////////
-/* Number of time bin */
-const int N_tbin = 2048;
-
-/* Ambient density profile */
-const double rfs_min = 1.0e12; /* minimum radius of the free expansion phase in unit of [cm] */
-const double v_w_str=1.0e8;
-const double Mdot_str=1.0e-5*M_SUN/YR;
-//const double k=2.0;
-//const double A=Mdot_str/4.0/M_PI/v_w_str;
-const double k=0.0;
-const double A=1.*M_PRO;
-const double a=1.0; /* see Granot & Piran 2011 */
-const double b=0.45; /* see Granot & Piran 2011 */
-
-/* jet parameters  */
-const double theta_j_0=2.0*M_PI*5.0/360.0;
-const double gam_j_0=200.0;
-
-/* path */
-const char path[256]="/Users/kakashi/offaxis_data/cnst0/G200thetaj5/";
-/////////////////////////////////////////
-
-
-void calc_conical_model();
-void calc_jet();
+#include "input.h"
+#include "funclist.h"
 
 
 int main()
