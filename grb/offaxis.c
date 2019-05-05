@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <math.h>
 
+/////////////////////////////////////////
+/* physical constant */
+/////////////////////////////////////////
 const double E_c = 4.3e54; /* [erg] */
 const double M_c = 22.0*2e33; /* [g] */
 const double R_c = 2.0e13; /* [cm] */
@@ -30,7 +33,7 @@ const double GAMMA13 = 2.67893; /* Gamma(1/3) */
 
 
 /////////////////////////////////////////
-/* input parameters */
+/* input parameter */
 /////////////////////////////////////////
 /* Ambient density profile */
 const double rfs_min = 1.0e12; /* minimum radius of the free expansion phase in unit of [cm] */
