@@ -13,7 +13,7 @@ const char path[256]="/Users/kakashi/offaxis_data/test_offaxis/";
 /* frequency in the observer frame */
 const double nuobs = 1.0e8;
 /* observer angle */
-const double thetaobs = 2.0*M_PI*0./360.0;
+const double thetaobs = 2.0*M_PI*15./360.0;
 /* redshift */
 const double z = 0.1;
 
