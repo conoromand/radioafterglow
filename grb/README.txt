@@ -8,3 +8,5 @@ what the code can do：
 3. calculate "egg shape" for a given T_obs (Eq. 2 of GPS99) --> R_egg(mu)
 4. integrate the emissivity along with the egg shape
 5. repeat the calculations to obtain light curves and/or spectra
+
+How to compile?
